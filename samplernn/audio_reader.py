@@ -33,15 +33,19 @@ def load_generic_audio(directory, sample_rate):
     files = find_files(directory)
     print("files length: {}".format(len(files)))
     randomized_files = randomize_files(files)
+    i = 0
     for filename in randomized_files:
         audio, _ = librosa.load(filename, sr=sample_rate, mono=True)
         audio = audio.reshape(-1, 1)
+        #print(audio, audio.size, filename)
+        i+=1
+        print("Loading corpus entry '{}' ({}/{})".format(filename, i, len(files)))
         yield audio, filename
 
 
 def trim_silence(audio, threshold):
     '''Removes silence at the beginning and end of a sample.'''
-    energy = librosa.feature.rmse(audio)
+    energy = librosa.feature.rms(audio)
     frames = np.nonzero(energy > threshold)
     indices = librosa.core.frames_to_samples(frames)[1]
 
