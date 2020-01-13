@@ -52,7 +52,3 @@ or
 ```shell
 sh run.sh
 ```
-## Related projects
-This work is based on the flowing implementations with some modifications:  
-* [tensorflow-wavenet](https://github.com/ibab/tensorflow-wavenet), a TensorFlow implementation of WaveNet
-* [sampleRNN_ICLR2017](https://github.com/soroushmehr/sampleRNN_ICLR2017), a Theano implementation of sampleRNN
