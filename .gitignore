@@ -7,3 +7,4 @@
 pip-selfcheck.json
 __pycache__
 *.wav
+**/.DS_Store
