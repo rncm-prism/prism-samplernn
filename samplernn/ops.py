@@ -3,19 +3,19 @@ import tensorflow as tf
 
 
 def create_adam_optimizer(learning_rate, momentum):
-    return tf.train.AdamOptimizer(learning_rate=learning_rate,
-                                  epsilon=1e-4)
+    return tf.optimizers.Adam(learning_rate=learning_rate,
+                              epsilon=1e-4)
 
 
 def create_sgd_optimizer(learning_rate, momentum):
-    return tf.train.MomentumOptimizer(learning_rate=learning_rate,
-                                      momentum=momentum)
+    return tf.optimizers.SGD(learning_rate=learning_rate,
+                             momentum=momentum)
 
 
 def create_rmsprop_optimizer(learning_rate, momentum):
-    return tf.train.RMSPropOptimizer(learning_rate=learning_rate,
-                                     momentum=momentum,
-                                     epsilon=1e-5)
+    return tf.optimizers.RMSprop(learning_rate=learning_rate,
+                                 momentum=momentum,
+                                 epsilon=1e-5)
 
 
 optimizer_factory = {'adam': create_adam_optimizer,

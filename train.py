@@ -11,12 +11,11 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow.python.client import timeline
-from samplernn import SampleRnnModel
-from samplernn import AudioReader
+from samplernn import SampleRNN
+from samplernn import (load_audio, find_files)
 from samplernn import mu_law_decode
 from samplernn import optimizer_factory
 
-DATA_DIRECTORY = './pinao-corpus'
 LOGDIR_ROOT = './logdir'
 CHECKPOINT_EVERY = 5
 GENERATE_EVERY = 10
@@ -27,47 +26,39 @@ L2_REGULARIZATION_STRENGTH = 0
 SILENCE_THRESHOLD = None
 MOMENTUM = 0.9
 MAX_TO_KEEP = 5
-
 N_SECS = 3
-SAMPLE_RATE = 22050
+SAMPLE_RATE = 44100 #22050
 LENGTH = N_SECS * SAMPLE_RATE
-
-BATCH_SIZE = 1
-NUM_GPU = 1
+SEQ_LEN = 1024
+Q_LEVELS = 256
+DIM = 1024
+N_RNN = 1
+BATCH_SIZE = 64 #1
+NUM_GPUS = 1
 
 
 def get_arguments():
-    parser = argparse.ArgumentParser(description='SampleRnn example network')
-    parser.add_argument('--num_gpus',         type=int,   default=NUM_GPU)
-    parser.add_argument('--batch_size',       type=int,   default=BATCH_SIZE)
-    parser.add_argument('--data_dir',         type=str,
-                        default=DATA_DIRECTORY)
-    parser.add_argument('--logdir_root',      type=str,   default=LOGDIR_ROOT)
-    parser.add_argument('--checkpoint_every', type=int,
-                        default=CHECKPOINT_EVERY)
-    parser.add_argument('--num_steps',        type=int,   default=NUM_STEPS)
-    parser.add_argument('--learning_rate',    type=float,
-                        default=LEARNING_RATE)
-    parser.add_argument('--sample_size',      type=int,   default=SAMPLE_SIZE)
-    parser.add_argument('--sample_rate',      type=int,   default=SAMPLE_RATE)
-    parser.add_argument('--l2_regularization_strength',
-                        type=float, default=L2_REGULARIZATION_STRENGTH)
-    parser.add_argument('--silence_threshold', type=float,
-                        default=SILENCE_THRESHOLD)
-    parser.add_argument('--optimizer',        type=str,
-                        default='adam', choices=optimizer_factory.keys())
-    parser.add_argument('--momentum',         type=float, default=MOMENTUM)
-
-    parser.add_argument('--seq_len',          type=int, required=True)
-    parser.add_argument('--big_frame_size',   type=int, required=True)
-    parser.add_argument('--frame_size',       type=int, required=True)
-    parser.add_argument('--q_levels',         type=int, required=True)
-    parser.add_argument('--dim',              type=int, required=True)
-    parser.add_argument('--n_rnn',            type=int,
-                        choices=list(range(1, 6)), required=True)
-    parser.add_argument('--emb_size',         type=int, required=True)
-    parser.add_argument('--rnn_type', choices=['LSTM', 'GRU'], required=True)
-    parser.add_argument('--max_checkpoints',  type=int, default=MAX_TO_KEEP)
+    parser = argparse.ArgumentParser(description='SampleRnn')
+    parser.add_argument('--data_dir',                   type=str,   required=True)
+    parser.add_argument('--num_gpus',                   type=int,   default=NUM_GPUS)
+    parser.add_argument('--batch_size',                 type=int,   default=BATCH_SIZE)
+    parser.add_argument('--logdir_root',                type=str,   default=LOGDIR_ROOT)
+    parser.add_argument('--checkpoint_every',           type=int,   default=CHECKPOINT_EVERY)
+    parser.add_argument('--num_steps',                  type=int,   default=NUM_STEPS)
+    parser.add_argument('--learning_rate',              type=float, default=LEARNING_RATE)
+    parser.add_argument('--sample_size',                type=int,   default=SAMPLE_SIZE)
+    parser.add_argument('--sample_rate',                type=int,   default=SAMPLE_RATE)
+    parser.add_argument('--l2_regularization_strength', type=float, default=L2_REGULARIZATION_STRENGTH)
+    parser.add_argument('--silence_threshold',          type=float, default=SILENCE_THRESHOLD)
+    parser.add_argument('--optimizer',                  type=str,   default='adam', choices=optimizer_factory.keys())
+    parser.add_argument('--momentum',                   type=float, default=MOMENTUM)
+    parser.add_argument('--seq_len',                    type=int,   default=SEQ_LEN)
+    parser.add_argument('--frame_sizes',                type=int,   required=True, nargs='*')
+    parser.add_argument('--q_levels',                   type=int,   default=Q_LEVELS)
+    parser.add_argument('--dim',                        type=int,   default=DIM)
+    parser.add_argument('--n_rnn',                      type=int,   default=N_RNN, choices=list(range(1, 6)))
+    parser.add_argument('--emb_size',                   type=int,   required=True)
+    parser.add_argument('--max_checkpoints',            type=int,   default=MAX_TO_KEEP)
     return parser.parse_args()
 
 
@@ -102,21 +93,6 @@ def load(saver, sess, logdir):
     else:
         print(" No checkpoint found.")
         return None
-
-
-def create_model(args):
-    # Create network.
-    net = SampleRnnModel(
-        batch_size=args.batch_size,
-        big_frame_size=args.big_frame_size,
-        frame_size=args.frame_size,
-        q_levels=args.q_levels,
-        rnn_type=args.rnn_type,
-        dim=args.dim,
-        n_rnn=args.n_rnn,
-        seq_len=args.seq_len,
-        emb_size=args.emb_size)
-    return net
 
 
 def average_gradients(tower_grads):
@@ -373,7 +349,7 @@ def generate_and_save_samples(step, net, infe_para, sess):
             break
 
 
-def main():
+def main_orig():
     args = get_arguments()
     if args.l2_regularization_strength == 0:
         args.l2_regularization_strength = None
@@ -551,6 +527,41 @@ def main():
             save(saver, sess, logdir, step)
         coord.request_stop()
         coord.join(threads)
+
+def main():
+    args = get_arguments()
+    if not find_files(args.data_dir):
+        raise ValueError("No audio files found in '{}'.".format(args.data_dir))
+    if args.l2_regularization_strength == 0:
+        args.l2_regularization_strength = None
+    logdir = os.path.join(args.logdir_root, 'train')
+
+    dataset = tf.data.Dataset.from_generator(
+        # See here for why lambda is required: https://stackoverflow.com/a/56602867
+        lambda: load_audio(args.data_dir, args.sample_rate, args.sample_size, args.silence_threshold),
+        output_types=tf.float32,
+        output_shapes=((None, 1)), # Not sure about the precise value of this...
+    )
+    dataset = dataset.batch(args.batch_size)
+    model = SampleRNN(
+        batch_size=args.batch_size,
+        frame_sizes=args.frame_sizes,
+        q_levels=args.q_levels,
+        dim=args.dim,
+        n_rnn=args.n_rnn,
+        seq_len=args.seq_len,
+        emb_size=args.emb_size,
+    )
+    #global_step = tf.get_variable(
+    #    'global_step',
+    #    [],
+    #    initializer=tf.constant_initializer(0),
+    #    trainable=False
+    #)
+    optim = optimizer_factory[args.optimizer](
+        learning_rate=args.learning_rate,
+        momentum=args.momentum)
+    [tf.print(batch) for batch in dataset]
 
 
 if __name__ == '__main__':

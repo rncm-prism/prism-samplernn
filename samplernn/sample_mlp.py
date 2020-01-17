@@ -8,8 +8,9 @@ class SampleMLP(tf.keras.layers.Layer):
         self.dim = dim
         self.q_levels = q_levels
         self.emb_size = emb_size
-        initializer = tf.initializers.GlorotNormal([self.emb_size*2, 1, self.dim])
-        self.sample_filter = tf.Variable(initializer, name="sample_filter")
+        sample_filter_shape = [self.emb_size*2, 1, self.dim]
+        initializer = tf.initializers.GlorotNormal(sample_filter_shape)
+        self.sample_filter = tf.Variable(sample_filter_shape, name="sample_filter")
 
     def build(self, input_shape, units):
         self.mlp1 = self.add_weight(shape=(input_shape, units),

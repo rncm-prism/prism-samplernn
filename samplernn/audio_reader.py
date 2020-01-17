@@ -28,47 +28,70 @@ def find_files(directory, pattern='*.wav'):
     return files
 
 
-def load_generic_audio(directory, sample_rate):
+def load_audio(directory, sample_rate, sample_size, silence_threshold):
     '''Generator that yields audio waveforms from the directory.'''
     files = find_files(directory)
-    print("files length: {}".format(len(files)))
+    print("Corpus length: {} files.".format(len(files)))
     randomized_files = randomize_files(files)
     i = 0
     for filename in randomized_files:
         audio, _ = librosa.load(filename, sr=sample_rate, mono=True)
         audio = audio.reshape(-1, 1)
-        #print(audio, audio.size, filename)
+        #audio = preprocess_audio(audio, silence_threshold, sample_size)
         i+=1
         print("Loading corpus entry '{}' ({}/{})".format(filename, i, len(files)))
-        yield audio, filename
-
+        #yield audio, filename
+        yield audio
 
 def trim_silence(audio, threshold):
     '''Removes silence at the beginning and end of a sample.'''
     energy = librosa.feature.rms(audio)
     frames = np.nonzero(energy > threshold)
     indices = librosa.core.frames_to_samples(frames)[1]
-
     # Note: indices can be an empty array, if the whole audio was silence.
     return audio[indices[0]:indices[-1]] if indices.size else audio[0:0]
 
+def preprocess_audio(audio, silence_threshold, sample_size):
+    audio = copy.deepcopy(audio)
+    if silence_threshold is not None:
+        # Remove silence
+        audio = trim_silence(audio[:, 0], silence_threshold)
+        audio = audio.reshape(-1, 1)
+        if audio.size == 0:
+            print("Warning: {} was ignored as it contains only "
+                    "silence. Consider decreasing trim_silence "
+                    "threshold, or adjust volume of the audio.")
+    pad_elements = sample_size - 1 - \
+        (audio.shape[0] + sample_size - 1) % sample_size
+    audio = np.concatenate(
+        [
+            audio,
+            np.full(
+                (pad_elements, 1),
+                0.0,
+                dtype='float32'
+            )
+        ],
+        axis=0
+    )
+    #if sample_size:
+    #    while len(audio) >= sample_size:
+    #        piece = audio[:sample_size, :]
+    #        sess.run(self.enqueue,
+    #                    feed_dict={self.sample_placeholder: piece})
+    #        audio = audio[sample_size:, :]
+    return audio
 
 class AudioReader(object):
     '''Generic background audio reader that preprocesses audio files
     and enqueues them into a TensorFlow queue.'''
 
-    def __init__(self, audio_dir, coord, sample_rate, sample_size=None,
-                 silence_threshold=None, queue_size=32):
+    def __init__(self, audio_dir, sample_rate, sample_size=None,
+                 silence_threshold=None):
         self.audio_dir = audio_dir
         self.sample_rate = sample_rate
-        self.coord = coord
         self.sample_size = sample_size
         self.silence_threshold = silence_threshold
-        self.threads = []
-        self.sample_placeholder = tf.placeholder(dtype=tf.float32, shape=None)
-        self.queue = tf.PaddingFIFOQueue(
-            queue_size, ['float32'], shapes=[(None, 1)])
-        self.enqueue = self.queue.enqueue([self.sample_placeholder])
 
         # TODO Find a better way to check this.
         # Checking inside the AudioReader's thread makes it hard to terminate
@@ -77,58 +100,11 @@ class AudioReader(object):
         if not files:
             raise ValueError("No audio files found in '{}'.".format(audio_dir))
 
-    def dequeue(self, num_elements):
-        output = self.queue.dequeue_many(num_elements)
-        return output
-
-    def thread_main(self, sess):
-        stop = False
-        # Go through the dataset multiple times
-        audio_list = []
-        iterator = load_generic_audio(self.audio_dir, self.sample_rate)
-        for audio, _ in iterator:
-            audio_list.append(audio)
-        while not stop:
-            for audio_copy in audio_list:
-                audio = copy.deepcopy(audio_copy)
-                if self.coord.should_stop():
-                    stop = True
-                    break
-                if self.silence_threshold is not None:
-                    # Remove silence
-                    audio = trim_silence(audio[:, 0], self.silence_threshold)
-                    audio = audio.reshape(-1, 1)
-                    if audio.size == 0:
-                        print("Warning: {} was ignored as it contains only "
-                              "silence. Consider decreasing trim_silence "
-                              "threshold, or adjust volume of the audio.")
-                pad_elements = self.sample_size - 1 - \
-                    (audio.shape[0] + self.sample_size - 1) % self.sample_size
-                audio = np.concatenate(
-                    [
-                        audio,
-                        np.full(
-                            (pad_elements, 1),
-                            0.0,
-                            dtype='float32'
-                        )
-                    ],
-                    axis=0
-                )
-                if self.sample_size:
-                    while len(audio) >= self.sample_size:
-                        piece = audio[:self.sample_size, :]
-                        sess.run(self.enqueue,
-                                 feed_dict={self.sample_placeholder: piece})
-                        audio = audio[self.sample_size:, :]
-                else:
-                    sess.run(self.enqueue,
-                             feed_dict={self.sample_placeholder: audio})
-
-    def start_threads(self, sess, n_threads=1):
-        for _ in range(n_threads):
-            thread = threading.Thread(target=self.thread_main, args=(sess,))
-            thread.daemon = True  # Thread will close when parent quits.
-            thread.start()
-            self.threads.append(thread)
-        return self.threads
+    def getDataset(self):
+        dataset = tf.data.Dataset.from_generator(
+            # See here for why lambda is required: https://stackoverflow.com/a/56602867
+            lambda: load_audio(self.audio_dir, self.sample_rate, self.sample_size, self.silence_threshold),
+            output_types=tf.float32,
+            output_shapes=((None,)), # Not sure about the value of this...
+        )
+        return dataset

@@ -5,16 +5,15 @@ PRiSM implementation of [SampleRNN: An Unconditional End-to-End Neural Audio Gen
 Forked from https://github.com/gogobd/SampleRNN. Implements a 3-tier SampleRNN architecture, with mu-law quantization.
 
 ## Requirements
-- Tensroflow 1.2  
-- Python 3.6  
+- Tensroflow 2 
 - Librosa   
 
 ## Installation
 To install on you will need Anaconda. When you have that all set up open the Anaconda prompt and create a new environment with:
 
-`conda create -n prism-samplernn python=3.6 anaconda`
+`conda create -n prism-samplernn anaconda`
 
-Our Anaconda environment uses Python 3.6. We're naming the environment after the repo, but you can choose whatever name you like. Then activate it with:
+We're naming the environment after the repo, but you can choose whatever name you like. Then activate it with:
 
 `conda activate prism-samplernn`
 
