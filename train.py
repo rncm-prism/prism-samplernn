@@ -535,7 +535,8 @@ def main():
     if args.l2_regularization_strength == 0:
         args.l2_regularization_strength = None
     logdir = os.path.join(args.logdir_root, 'train')
-
+    
+    dist_strategy = tf.distribute.MirroredStrategy()
     dataset = tf.data.Dataset.from_generator(
         # See here for why lambda is required: https://stackoverflow.com/a/56602867
         lambda: load_audio(args.data_dir, args.sample_rate, args.sample_size, args.silence_threshold),
@@ -543,25 +544,46 @@ def main():
         output_shapes=((None, 1)), # Not sure about the precise value of this...
     )
     dataset = dataset.batch(args.batch_size)
-    model = SampleRNN(
-        batch_size=args.batch_size,
-        frame_sizes=args.frame_sizes,
-        q_levels=args.q_levels,
-        dim=args.dim,
-        n_rnn=args.n_rnn,
-        seq_len=args.seq_len,
-        emb_size=args.emb_size,
+    #[tf.print(batch) for batch in dataset]
+    dist_dataset = dist_strategy.experimental_distribute_dataset(dataset)
+    with dist_strategy.scope()
+        model = SampleRNN(
+            batch_size=args.batch_size,
+            frame_sizes=args.frame_sizes,
+            q_levels=args.q_levels,
+            dim=args.dim,
+            n_rnn=args.n_rnn,
+            seq_len=args.seq_len,
+            emb_size=args.emb_size,
+        )
+        optim = optimizer_factory[args.optimizer](
+            learning_rate=args.learning_rate,
+            momentum=args.momentum)
+
+    def step_fn(inputs):
+        features, labels = inputs
+        with tf.GradientTape() as tape:
+            logits = model(features, training=True)
+            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
+                logits=logits,
+                labels=labels,
+            )
+            loss = tf.reduce_sum(cross_entropy) * (1.0 / args.batch_size)
+        grads = tape.gradient(loss, model.trainable_variables)
+        optim.apply_gradients(list(zip(grads, model.trainable_variables)))
+        return cross_entropy
+
+    losses = dist_strategy.experimental_run_v2(
+        step_fn,
+        args=(dist_inputs,),
     )
-    #global_step = tf.get_variable(
-    #    'global_step',
-    #    [],
-    #    initializer=tf.constant_initializer(0),
-    #    trainable=False
-    #)
-    optim = optimizer_factory[args.optimizer](
-        learning_rate=args.learning_rate,
-        momentum=args.momentum)
-    [tf.print(batch) for batch in dataset]
+    mean_loss = dist_strategy.reduce(
+        tf.distribute.ReduceOp.MEAN,
+        losses,
+        axis=0,
+    )
+
+    
 
 
 if __name__ == '__main__':

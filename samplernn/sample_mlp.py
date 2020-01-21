@@ -12,32 +12,46 @@ class SampleMLP(tf.keras.layers.Layer):
         initializer = tf.initializers.GlorotNormal(sample_filter_shape)
         self.sample_filter = tf.Variable(sample_filter_shape, name="sample_filter")
 
-    def build(self, input_shape, units):
-        self.mlp1 = self.add_weight(shape=(input_shape, units),
-                                initializer='random_normal',
-                                trainable=True)
-        self.mlp2 = self.add_weight(shape=(input_shape, units),
-                                initializer='random_normal',
-                                trainable=True)
-        self.mlp3 = self.add_weight(shape=(input_shape, units),
-                                initializer='random_normal',
-                                trainable=True)
+    def build(self, input_shape):
+        self.mlp1_weights = self.add_weight(
+            name="mlp1_weights",
+            shape=(input_shape),
+            dtype=tf.float32,
+            trainable=True,
+        )
+        self.mlp2_weights = self.add_weight(
+            name="mlp2_weights",
+            shape=(input_shape),
+            dtype=tf.float32,
+            trainable=True,
+        )
+        self.mlp3_weights = self.add_weight(
+            name="mlp3_weights",
+            shape=(input_shape),
+            dtype=tf.float32,
+            trainable=True,
+        )
 
-    def call(self, frame_outputs, sample_input_sequences):
-        sample_shape = [tf.shape(sample_input_sequences)[0],
-            tf.shape(sample_input_sequences)[1]*self.emb_size,
-            1]
-        sample_input_sequences = tf.nn.embedding_lookup(
-            [self.q_levels, self.emb_size], tf.reshape(sample_input_sequences, [-1]))
-        sample_input_sequences = tf.reshape(
-            sample_input_sequences, sample_shape)
-        out = tf.nn.conv1d(sample_input_sequences,
-                        self.sample_filter,
-                        stride=self.emb_size,
-                        padding="VALID",
-                        name="sample_conv")
-        out = out + frame_outputs
-        out = tf.nn.relu(tf.matmul(out, self.mlp1))
-        out = tf.nn.relu(tf.matmul(out, self.mlp2))
-        out = tf.matmul(out, self.mlp3)
+    def call(self, inputs, conditioning_frames):
+        sample_shape = [
+            tf.shape(inputs)[0],
+            tf.shape(inputs)[1]*self.emb_size,
+            1,
+        ]
+        inputs = tf.nn.embedding_lookup(
+            [self.q_levels, self.emb_size],
+            tf.reshape(inputs, [-1]),
+        )
+        inputs = tf.reshape(inputs, sample_shape)
+        out = tf.nn.conv1d(
+            inputs,
+            self.sample_filter,
+            stride=self.emb_size,
+            padding="VALID",
+            name="sample_conv",
+        )
+        out = out + conditioning_frames
+        out = tf.nn.relu(tf.matmul(out, self.mlp1_weights))
+        out = tf.nn.relu(tf.matmul(out, self.mlp2_weights))
+        out = tf.matmul(out, self.mlp3_weights)
         return tf.reshape(out, [-1, sample_shape[1] // self.emb_size - 1, self.q_levels])

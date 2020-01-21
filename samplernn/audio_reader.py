@@ -32,6 +32,8 @@ def load_audio(directory, sample_rate, sample_size, silence_threshold):
     '''Generator that yields audio waveforms from the directory.'''
     files = find_files(directory)
     print("Corpus length: {} files.".format(len(files)))
+    # It does not seem as if os.walk guarantees sort order,
+    # so the randomization step is perhaps redundant?
     randomized_files = randomize_files(files)
     i = 0
     for filename in randomized_files:
