@@ -68,7 +68,7 @@ class SampleRNN(tf.keras.layers.Layer):
         big_frame_outputs, final_big_frame_state = self.big_frame_rnn(
             tf.cast(self.encoded_input_rnn, tf.float32)[
                 :,
-                :BIG_FRAME_SIZE,
+                :-BIG_FRAME_SIZE,
                 :
             ],
             num_steps=(self.seq_len-BIG_FRAME_SIZE) // BIG_FRAME_SIZE,

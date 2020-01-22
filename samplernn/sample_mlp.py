@@ -9,25 +9,28 @@ class SampleMLP(tf.keras.layers.Layer):
         self.q_levels = q_levels
         self.emb_size = emb_size
         sample_filter_shape = [self.emb_size*2, 1, self.dim]
-        initializer = tf.initializers.GlorotNormal(sample_filter_shape)
-        self.sample_filter = tf.Variable(sample_filter_shape, name="sample_filter")
+        initializer = tf.initializers.GlorotNormal()
+        self.sample_filter = tf.Variable(
+            initializer(shape=sample_filter_shape),
+            name="sample_filter",
+        )
 
     def build(self, input_shape):
         self.mlp1_weights = self.add_weight(
             name="mlp1_weights",
-            shape=(input_shape),
+            shape=[self.dim, self.dim],
             dtype=tf.float32,
             trainable=True,
         )
         self.mlp2_weights = self.add_weight(
             name="mlp2_weights",
-            shape=(input_shape),
+            shape=[self.dim, self.dim],
             dtype=tf.float32,
             trainable=True,
         )
         self.mlp3_weights = self.add_weight(
             name="mlp3_weights",
-            shape=(input_shape),
+            shape=[self.dim, self.dim],
             dtype=tf.float32,
             trainable=True,
         )
@@ -38,8 +41,12 @@ class SampleMLP(tf.keras.layers.Layer):
             tf.shape(inputs)[1]*self.emb_size,
             1,
         ]
+        initializer = tf.initializers.GlorotUniform()
+        embedding = tf.Variable(
+            initializer(shape=[self.q_levels, self.emb_size])
+        )
         inputs = tf.nn.embedding_lookup(
-            [self.q_levels, self.emb_size],
+            embedding,
             tf.reshape(inputs, [-1]),
         )
         inputs = tf.reshape(inputs, sample_shape)
