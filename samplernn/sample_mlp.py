@@ -30,7 +30,7 @@ class SampleMLP(tf.keras.layers.Layer):
         )
         self.mlp3_weights = self.add_weight(
             name="mlp3_weights",
-            shape=[self.dim, self.dim],
+            shape=[self.dim, self.q_levels],
             dtype=tf.float32,
             trainable=True,
         )
@@ -58,6 +58,7 @@ class SampleMLP(tf.keras.layers.Layer):
             name="sample_conv",
         )
         out = out + conditioning_frames
+        out = tf.reshape(out, [-1, self.dim])
         out = tf.nn.relu(tf.matmul(out, self.mlp1_weights))
         out = tf.nn.relu(tf.matmul(out, self.mlp2_weights))
         out = tf.matmul(out, self.mlp3_weights)
