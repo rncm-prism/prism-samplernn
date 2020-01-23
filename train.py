@@ -1,6 +1,5 @@
 from __future__ import print_function
 import argparse
-from datetime import datetime
 import json
 import os
 import sys
@@ -10,7 +9,6 @@ import librosa
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.python.client import timeline
 from samplernn import SampleRNN
 from samplernn import (load_audio, find_files)
 from samplernn import mu_law_decode
@@ -558,14 +556,26 @@ def main():
         )
         optim = optimizer_factory[args.optimizer](
             learning_rate=args.learning_rate,
-            momentum=args.momentum)
+            momentum=args.momentum,
+        )
+        checkpoint = tf.train.Checkpoint(optimizer=optim, model=model)
+        writer = tf.summary.create_file_writer(logdir)
 
     def step_fn(inputs):
-        features, labels = inputs
+        inputs = inputs[args.batch_size, args.seq_len, 1]
+        encoded_inputs_rnn = mu_law_encode(inputs, args.q_levels)
+        encoded_rnn = model._one_hot(encoded_input_rnn)
         with tf.GradientTape() as tape:
-            logits = model(features, training=True)
+            raw_output, final_big_frame_state, final_frame_state = model(
+                encoded_inputs_rnn,
+                training=True,
+            )
+            target_output_rnn = encoded_rnn[:, BIG_FRAME_SIZE:, :]
+            target_output_rnn = tf.reshape(
+                target_output_rnn, [-1, args.q_levels])
+            prediction = tf.reshape(raw_output, [-1, args.q_levels])
             cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
-                logits=logits,
+                logits=prediction,
                 labels=labels,
             )
             loss = tf.reduce_sum(cross_entropy) * (1.0 / args.batch_size)
@@ -573,17 +583,17 @@ def main():
         optim.apply_gradients(list(zip(grads, model.trainable_variables)))
         return cross_entropy
 
-    losses = dist_strategy.experimental_run_v2(
-        step_fn,
-        args=(dist_inputs,),
-    )
-    mean_loss = dist_strategy.reduce(
-        tf.distribute.ReduceOp.MEAN,
-        losses,
-        axis=0,
-    )
-
-    
+    with dist_strategy.scope()
+        for inputs in dist_dataset:
+            losses = dist_strategy.experimental_run_v2(
+                step_fn,
+                args=(inputs),
+            )
+            mean_loss = dist_strategy.reduce(
+                tf.distribute.ReduceOp.MEAN,
+                losses,
+                axis=0,
+            )
 
 
 if __name__ == '__main__':
