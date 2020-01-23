@@ -579,6 +579,8 @@ def main():
                 labels=labels,
             )
             loss = tf.reduce_sum(cross_entropy) * (1.0 / args.batch_size)
+            tf.summary.scalar('loss', loss)
+            writer.flush() # But see https://stackoverflow.com/a/52502679
         grads = tape.gradient(loss, model.trainable_variables)
         optim.apply_gradients(list(zip(grads, model.trainable_variables)))
         return cross_entropy
