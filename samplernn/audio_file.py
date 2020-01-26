@@ -3,6 +3,7 @@ import os
 import random
 
 import librosa
+import soundfile as sf
 import copy
 import numpy as np
 import tensorflow as tf
@@ -77,3 +78,6 @@ def preprocess_audio(audio, silence_threshold, sample_size):
         )
     return audio
 
+def write_wav(path, audio, sample_rate):
+    sf.write(path, np.array(audio), sample_rate)
+    #print('Updated wav file at {}'.format(path))

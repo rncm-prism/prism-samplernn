@@ -5,7 +5,6 @@ import sys
 import time
 
 import librosa
-import numpy as np
 import tensorflow as tf
 
 from samplernn import SampleRNN
@@ -32,6 +31,12 @@ DIM = 1024
 N_RNN = 1
 BATCH_SIZE = 1
 NUM_GPUS = 1
+
+# https://github.com/soroushmehr/sampleRNN_ICLR2017/blob/master/models/three_tier/three_tier.py
+# SEQ_LEN > BIG_FRAME_SIZE > FRAME_SIZE
+# SEQ_LEN should be divisible by BIG_FRAME_SIZE
+# BIG_FRAME_SIZE should be divisible by FRAME_SIZE
+# Number of frames in each truncated BPTT pass = SEQ_LEN / FRAME_SIZE
 
 
 def get_arguments():
@@ -67,44 +72,8 @@ def get_arguments():
     return parser.parse_args()
 
 
-def save(saver, sess, logdir, step):
-    model_name = 'model.ckpt'
-    checkpoint_path = os.path.join(logdir, model_name)
-    print('Storing checkpoint to {} ...'.format(logdir), end="")
-    sys.stdout.flush()
-
-    if not os.path.exists(logdir):
-        os.makedirs(logdir)
-
-    saver.save(sess, checkpoint_path, global_step=step)
-    print(' Done.')
-
-
-def load(saver, sess, logdir):
-    print("Trying to restore saved checkpoints from {} ...".format(logdir),
-          end="")
-
-    ckpt = tf.train.get_checkpoint_state(logdir)
-    if ckpt:
-        print("  Checkpoint found: {}".format(ckpt.model_checkpoint_path))
-        global_step = int(ckpt.model_checkpoint_path
-                          .split('/')[-1]
-                          .split('-')[-1])
-        print("  Global step was: {}".format(global_step))
-        print("  Restoring...", end="")
-        saver.restore(sess, ckpt.model_checkpoint_path)
-        print(" Done.")
-        return global_step
-    else:
-        print(" No checkpoint found.")
-        return None
-
-
-def write_wav(waveform, sample_rate, filename):
-    y = np.array(waveform)
-    librosa.output.write_wav(filename, y, sample_rate)
-    print('Updated wav file at {}'.format(filename))
-
+def generate_and_save_samples(step, model):
+    pass # for the moment...
 
 def main():
     args = get_arguments()
@@ -113,7 +82,9 @@ def main():
     if args.l2_regularization_strength == 0:
         args.l2_regularization_strength = None
     logdir = os.path.join(args.logdir_root, 'train')
-    
+    if not os.path.exists(logdir):
+        os.makedirs(logdir)
+
     dist_strategy = tf.distribute.MirroredStrategy()
     dataset = tf.data.Dataset.from_generator(
         # See here for why lambda is required: https://stackoverflow.com/a/56602867
@@ -138,13 +109,14 @@ def main():
             learning_rate=args.learning_rate,
             momentum=args.momentum,
         )
+        checkpoint_prefix = os.path.join(logdir, 'ckpt')
         checkpoint = tf.train.Checkpoint(optimizer=optim, model=model)
         writer = tf.summary.create_file_writer(logdir)
 
     def step_fn(inputs):
         inputs = inputs[args.batch_size, args.seq_len, 1]
         encoded_inputs_rnn = mu_law_encode(inputs, Q_LEVELS)
-        encoded_rnn = model._one_hot(encoded_input_rnn)
+        encoded_rnn = model._one_hot(encoded_inputs_rnn)
         with tf.GradientTape() as tape:
             raw_output, final_big_frame_state, final_frame_state = model(
                 encoded_inputs_rnn,
@@ -166,7 +138,12 @@ def main():
         return cross_entropy
 
     with dist_strategy.scope()
+        step = -1
         for inputs in dist_dataset:
+            step += 1
+            if (step-1) % GENERATE_EVERY == 0 and step > GENERATE_EVERY:
+                generate_and_save_samples(step, model)
+            start_time = time.time()
             losses = dist_strategy.experimental_run_v2(
                 step_fn,
                 args=(inputs),
@@ -176,6 +153,15 @@ def main():
                 losses,
                 axis=0,
             )
+
+            duration = time.time() - start_time
+            template = 'Step {:d}: Loss = {:.3f}, ({:.3f} sec/step)'
+            print(template.format(step, mean_loss, duration))
+
+            if step % args.checkpoint_every == 0:
+                checkpoint.save(checkpoint_prefix)
+                print('Storing checkpoint to {} ...'.format(logdir), end="")
+                sys.stdout.flush()
 
 
 if __name__ == '__main__':
