@@ -1,11 +1,8 @@
 import fnmatch
 import os
 import random
-import re
-import threading
 
 import librosa
-import sys
 import copy
 import numpy as np
 import tensorflow as tf
@@ -39,9 +36,9 @@ def load_audio(directory, sample_rate, sample_size, silence_threshold):
     for filename in randomized_files:
         audio, _ = librosa.load(filename, sr=sample_rate, mono=True)
         audio = audio.reshape(-1, 1)
-        #audio = preprocess_audio(audio, silence_threshold, sample_size)
         i+=1
         print("Loading corpus entry '{}' ({}/{})".format(filename, i, len(files)))
+        audio = preprocess_audio(audio, silence_threshold, sample_size)
         #yield audio, filename
         yield audio
 
@@ -54,59 +51,29 @@ def trim_silence(audio, threshold):
     return audio[indices[0]:indices[-1]] if indices.size else audio[0:0]
 
 def preprocess_audio(audio, silence_threshold, sample_size):
-    audio = copy.deepcopy(audio)
     if silence_threshold is not None:
         # Remove silence
         audio = trim_silence(audio[:, 0], silence_threshold)
         audio = audio.reshape(-1, 1)
         if audio.size == 0:
-            print("Warning: {} was ignored as it contains only "
-                    "silence. Consider decreasing trim_silence "
-                    "threshold, or adjust volume of the audio.")
-    pad_elements = sample_size - 1 - \
-        (audio.shape[0] + sample_size - 1) % sample_size
-    audio = np.concatenate(
-        [
-            audio,
-            np.full(
-                (pad_elements, 1),
-                0.0,
-                dtype='float32'
-            )
-        ],
-        axis=0
-    )
-    #if sample_size:
-    #    while len(audio) >= sample_size:
-    #        piece = audio[:sample_size, :]
-    #        sess.run(self.enqueue,
-    #                    feed_dict={self.sample_placeholder: piece})
-    #        audio = audio[sample_size:, :]
+            print("Warning: {0} was ignored as it contains only "
+                "silence. Consider decreasing trim_silence "
+                "threshold, or adjust volume of the audio.").format(
+                    filename
+                )
+    if sample_size:
+        pad_elements = sample_size - 1 - \
+            (audio.shape[0] + sample_size - 1) % sample_size
+        audio = np.concatenate(
+            [
+                audio,
+                np.full(
+                    (pad_elements, 1),
+                    0.0,
+                    dtype='float32'
+                )
+            ],
+            axis=0
+        )
     return audio
 
-class AudioReader(object):
-    '''Generic background audio reader that preprocesses audio files
-    and enqueues them into a TensorFlow queue.'''
-
-    def __init__(self, audio_dir, sample_rate, sample_size=None,
-                 silence_threshold=None):
-        self.audio_dir = audio_dir
-        self.sample_rate = sample_rate
-        self.sample_size = sample_size
-        self.silence_threshold = silence_threshold
-
-        # TODO Find a better way to check this.
-        # Checking inside the AudioReader's thread makes it hard to terminate
-        # the execution of the script, so we do it in the constructor for now.
-        files = find_files(audio_dir)
-        if not files:
-            raise ValueError("No audio files found in '{}'.".format(audio_dir))
-
-    def getDataset(self):
-        dataset = tf.data.Dataset.from_generator(
-            # See here for why lambda is required: https://stackoverflow.com/a/56602867
-            lambda: load_audio(self.audio_dir, self.sample_rate, self.sample_size, self.silence_threshold),
-            output_types=tf.float32,
-            output_shapes=((None,)), # Not sure about the value of this...
-        )
-        return dataset
