@@ -30,7 +30,7 @@ SEQ_LEN = 1024
 Q_LEVELS = 256
 DIM = 1024
 N_RNN = 1
-BATCH_SIZE = 64 #1
+BATCH_SIZE = 1
 NUM_GPUS = 1
 
 
@@ -57,8 +57,7 @@ def get_arguments():
                                                         help='Number of samples in each truncated BPTT pass')
     parser.add_argument('--frame_sizes',                type=int,   required=True, nargs='*',
                                                         help='Frame sizes in terms of the number of lower tier frames')
-    parser.add_argument('--q_levels',                   type=int,   default=Q_LEVELS,
-                                                        help='Number of audio quantization bins')
+    #parser.add_argument('--q_levels',                   type=int,   default=Q_LEVELS, help='Number of audio quantization bins')
     parser.add_argument('--dim',                        type=int,   default=DIM,
                                                         help='Number of cells in every RNN and MLP layer')
     parser.add_argument('--n_rnn',                      type=int,   default=N_RNN, choices=list(range(1, 6)),
@@ -129,7 +128,7 @@ def main():
         model = SampleRNN(
             batch_size=args.batch_size,
             frame_sizes=args.frame_sizes,
-            q_levels=args.q_levels,
+            q_levels=Q_LEVELS, #args.q_levels,
             dim=args.dim,
             n_rnn=args.n_rnn,
             seq_len=args.seq_len,
@@ -144,7 +143,7 @@ def main():
 
     def step_fn(inputs):
         inputs = inputs[args.batch_size, args.seq_len, 1]
-        encoded_inputs_rnn = mu_law_encode(inputs, args.q_levels)
+        encoded_inputs_rnn = mu_law_encode(inputs, Q_LEVELS)
         encoded_rnn = model._one_hot(encoded_input_rnn)
         with tf.GradientTape() as tape:
             raw_output, final_big_frame_state, final_frame_state = model(
@@ -153,8 +152,8 @@ def main():
             )
             target_output_rnn = encoded_rnn[:, BIG_FRAME_SIZE:, :]
             target_output_rnn = tf.reshape(
-                target_output_rnn, [-1, args.q_levels])
-            prediction = tf.reshape(raw_output, [-1, args.q_levels])
+                target_output_rnn, [-1, Q_LEVELS])
+            prediction = tf.reshape(raw_output, [-1, Q_LEVELS])
             cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
                 logits=prediction,
                 labels=labels,
