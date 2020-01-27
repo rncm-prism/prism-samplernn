@@ -114,25 +114,28 @@ def main():
         writer = tf.summary.create_file_writer(logdir)
 
     def step_fn(inputs):
-        inputs = inputs[:args.seq_len, :]
+        inputs = tf.convert_to_tensor([inputs])
+        inputs = inputs[:, :args.seq_len, :]
         encoded_inputs_rnn = mu_law_encode(inputs, Q_LEVELS)
         encoded_rnn = model._one_hot(encoded_inputs_rnn)
         with tf.GradientTape() as tape:
             raw_output, final_big_frame_state, final_frame_state = model(
                 encoded_inputs_rnn,
-                tf.zeros([args.batch_size,], tf.float32),
-                tf.zeros([args.batch_size,], tf.float32),
+                tf.zeros([args.batch_size, args.dim], tf.float32),
+                tf.zeros([args.batch_size, args.dim], tf.float32),
                 training=True,
             )
+            BIG_FRAME_SIZE = model.big_frame_rnn.frame_size
             target_output_rnn = encoded_rnn[:, BIG_FRAME_SIZE:, :]
             target_output_rnn = tf.reshape(
                 target_output_rnn, [-1, Q_LEVELS])
             prediction = tf.reshape(raw_output, [-1, Q_LEVELS])
             cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
                 logits=prediction,
-                labels=labels,
+                labels=target_output_rnn,
             )
             loss = tf.reduce_sum(cross_entropy) * (1.0 / args.batch_size)
+            print(cross_entropy, loss)
             tf.summary.scalar('loss', loss)
             writer.flush() # But see https://stackoverflow.com/a/52502679
         grads = tape.gradient(loss, model.trainable_variables)
