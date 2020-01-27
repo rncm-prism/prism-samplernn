@@ -9,7 +9,7 @@ import tensorflow as tf
 
 from samplernn import SampleRNN
 from samplernn import (load_audio, find_files)
-from samplernn import mu_law_decode
+from samplernn import mu_law_encode
 from samplernn import optimizer_factory
 
 LOGDIR_ROOT = './logdir'
@@ -95,7 +95,7 @@ def main():
     dataset = dataset.batch(args.batch_size)
     #[tf.print(batch) for batch in dataset]
     dist_dataset = dist_strategy.experimental_distribute_dataset(dataset)
-    with dist_strategy.scope()
+    with dist_strategy.scope():
         model = SampleRNN(
             batch_size=args.batch_size,
             frame_sizes=args.frame_sizes,
@@ -114,12 +114,14 @@ def main():
         writer = tf.summary.create_file_writer(logdir)
 
     def step_fn(inputs):
-        inputs = inputs[args.batch_size, args.seq_len, 1]
+        inputs = inputs[:args.seq_len, :]
         encoded_inputs_rnn = mu_law_encode(inputs, Q_LEVELS)
         encoded_rnn = model._one_hot(encoded_inputs_rnn)
         with tf.GradientTape() as tape:
             raw_output, final_big_frame_state, final_frame_state = model(
                 encoded_inputs_rnn,
+                tf.zeros([args.batch_size,], tf.float32),
+                tf.zeros([args.batch_size,], tf.float32),
                 training=True,
             )
             target_output_rnn = encoded_rnn[:, BIG_FRAME_SIZE:, :]
@@ -137,7 +139,7 @@ def main():
         optim.apply_gradients(list(zip(grads, model.trainable_variables)))
         return cross_entropy
 
-    with dist_strategy.scope()
+    with dist_strategy.scope():
         step = -1
         for inputs in dist_dataset:
             step += 1
