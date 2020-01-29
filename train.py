@@ -9,7 +9,7 @@ import tensorflow as tf
 
 from samplernn import SampleRNN
 from samplernn import (load_audio, find_files)
-from samplernn import mu_law_encode
+from samplernn import (mu_law_encode, mu_law_decode)
 from samplernn import optimizer_factory
 
 LOGDIR_ROOT = './logdir'
@@ -72,8 +72,14 @@ def get_arguments():
     return parser.parse_args()
 
 
-def generate_and_save_samples(step, model):
-    pass # for the moment...
+def generate_and_save_samples(samples, step, model):
+    for i in range(model.batch_size):
+        samples = samples[i].reshape([-1, 1]).tolist()
+        audio = mu_law_decode(samples, model.q_levels)
+        path = './generated/test_' + str(step)+'_'+str(i)+'.wav'
+        write_wav(path, audio, model.sample_rate)
+        if i >= 10:
+            break
 
 def main():
     args = get_arguments()
@@ -146,7 +152,7 @@ def main():
         for inputs in dist_dataset:
             step += 1
             if (step-1) % GENERATE_EVERY == 0 and step > GENERATE_EVERY:
-                generate_and_save_samples(step, model)
+                #generate_and_save_samples(step, model)
             start_time = time.time()
             losses = dist_strategy.experimental_run_v2(
                 step_fn,
