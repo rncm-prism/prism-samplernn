@@ -81,7 +81,7 @@ def generate_and_save_samples(samples, step, model):
         if i >= 10:
             break
 
-def main():
+def main_dist():
     args = get_arguments()
     if not find_files(args.data_dir):
         raise ValueError("No audio files found in '{}'.".format(args.data_dir))
@@ -140,7 +140,7 @@ def main():
                 logits=prediction,
                 labels=target_output_rnn,
             )
-            loss = tf.reduce_sum(cross_entropy) * (1.0 / args.batch_size)
+            loss = tf.reduce_sum(cross_entropy) / args.seq_len / args.batch_size
             tf.summary.scalar('loss', loss)
             writer.flush() # But see https://stackoverflow.com/a/52502679
         grads = tape.gradient(loss, model.trainable_variables)
@@ -152,6 +152,7 @@ def main():
         for inputs in dist_dataset:
             step += 1
             if (step-1) % GENERATE_EVERY == 0 and step > GENERATE_EVERY:
+                print('Generating samples...')
                 #generate_and_save_samples(step, model)
             start_time = time.time()
             losses = dist_strategy.experimental_run_v2(
@@ -172,6 +173,91 @@ def main():
                 checkpoint.save(checkpoint_prefix)
                 print('Storing checkpoint to {} ...'.format(logdir), end="")
                 sys.stdout.flush()
+
+def main():
+    args = get_arguments()
+    if not find_files(args.data_dir):
+        raise ValueError("No audio files found in '{}'.".format(args.data_dir))
+    if args.l2_regularization_strength == 0:
+        args.l2_regularization_strength = None
+    logdir = os.path.join(args.logdir_root, 'train')
+    if not os.path.exists(logdir):
+        os.makedirs(logdir)
+
+    dataset = tf.data.Dataset.from_generator(
+        # See here for why lambda is required: https://stackoverflow.com/a/56602867
+        lambda: load_audio(args.data_dir, args.sample_rate, args.sample_size, args.silence_threshold),
+        output_types=tf.float32,
+        output_shapes=((None, 1)), # Not sure about the precise value of this...
+    )
+    dataset = dataset.repeat().batch(args.batch_size)
+    model = SampleRNN(
+        batch_size=args.batch_size,
+        frame_sizes=args.frame_sizes,
+        q_levels=Q_LEVELS, #args.q_levels,
+        dim=args.dim,
+        n_rnn=args.n_rnn,
+        seq_len=args.seq_len,
+        emb_size=args.emb_size,
+    )
+    optim = optimizer_factory[args.optimizer](
+        learning_rate=args.learning_rate,
+        momentum=args.momentum,
+    )
+    checkpoint_prefix = os.path.join(logdir, 'ckpt')
+    checkpoint = tf.train.Checkpoint(optimizer=optim, model=model)
+    writer = tf.summary.create_file_writer(logdir)
+
+    train_iter = iter(dataset)
+
+    for step in range(args.num_steps):
+        if (step-1) % GENERATE_EVERY == 0 and step > GENERATE_EVERY:
+            print('Generating samples...')
+            #generate_and_save_samples(step, model)
+        start_time = time.time()
+        total_loss = 0
+        inputs = next(train_iter)
+        final_big_frame_state = tf.zeros([args.batch_size, args.dim], tf.float32)
+        final_frame_state = tf.zeros([args.batch_size, args.dim], tf.float32)
+        BIG_FRAME_SIZE = model.big_frame_rnn.frame_size
+        audio_len = inputs.shape[1] - BIG_FRAME_SIZE
+        bptt_len = args.seq_len - BIG_FRAME_SIZE
+        rnn_len = audio_len // bptt_len
+        for i in range(0, audio_len, bptt_len):
+            with tf.GradientTape() as tape:
+                seq = inputs[:, i : i+args.seq_len, :]
+                encoded_inputs_rnn = mu_law_encode(seq, Q_LEVELS)
+                encoded_rnn = model._one_hot(encoded_inputs_rnn)
+                raw_output, final_big_frame_state, final_frame_state = model(
+                    encoded_inputs_rnn,
+                    final_big_frame_state,
+                    final_frame_state,
+                    training=True,
+                )
+                target_output_rnn = encoded_rnn[:, BIG_FRAME_SIZE:, :]
+                target_output_rnn = tf.reshape(
+                  target_output_rnn, [-1, Q_LEVELS])
+                prediction = tf.reshape(raw_output, [-1, Q_LEVELS])
+                cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
+                    logits=prediction,
+                    labels=target_output_rnn,
+                )
+                loss = tf.reduce_sum(cross_entropy) / args.seq_len / args.batch_size
+                total_loss += loss / rnn_len
+                tf.summary.scalar('loss', loss)
+                writer.flush() # But see https://stackoverflow.com/a/52502679
+                print(i, loss, total_loss)
+            grads = tape.gradient(loss, model.trainable_variables)
+            optim.apply_gradients(list(zip(grads, model.trainable_variables)))
+
+        duration = time.time() - start_time
+        template = 'Step {:d}: Loss = {:.3f}, ({:.3f} sec/step)'
+        print(template.format(step, total_loss, duration))
+
+        if step % args.checkpoint_every == 0:
+            checkpoint.save(checkpoint_prefix)
+            print('Storing checkpoint to {} ...'.format(logdir), end="")
+            sys.stdout.flush()
 
 
 if __name__ == '__main__':
