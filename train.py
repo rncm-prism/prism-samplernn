@@ -242,7 +242,7 @@ def main():
                     logits=prediction,
                     labels=target_output_rnn,
                 )
-                loss = tf.reduce_sum(cross_entropy) / args.seq_len / args.batch_size
+                loss = tf.reduce_mean(cross_entropy)
                 total_loss += loss / rnn_len
                 tf.summary.scalar('loss', loss)
                 writer.flush() # But see https://stackoverflow.com/a/52502679
