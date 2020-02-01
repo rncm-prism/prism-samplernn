@@ -38,7 +38,8 @@ def load_audio(directory, sample_rate, sample_size, silence_threshold):
         audio, _ = librosa.load(filename, sr=sample_rate, mono=True)
         audio = audio.reshape(-1, 1)
         i+=1
-        print("Loading corpus entry '{}' ({}/{})".format(filename, i, len(files)))
+        #print("Loading corpus entry '{}' ({}/{})".format(filename, i, len(files)))
+        print("Loading corpus entry {}".format(filename))
         audio = preprocess_audio(audio, silence_threshold, sample_size)
         #yield audio, filename
         yield audio

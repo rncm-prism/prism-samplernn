@@ -210,13 +210,9 @@ def main():
 
     train_iter = iter(dataset)
 
-    for step in range(args.num_steps):
-        if (step-1) % GENERATE_EVERY == 0 and step > GENERATE_EVERY:
-            print('Generating samples...')
-            #generate_and_save_samples(step, model)
-        start_time = time.time()
+    #@tf.function
+    def train_step(inputs):
         total_loss = 0
-        inputs = next(train_iter)
         final_big_frame_state = tf.zeros([args.batch_size, args.dim], tf.float32)
         final_frame_state = tf.zeros([args.batch_size, args.dim], tf.float32)
         BIG_FRAME_SIZE = model.big_frame_rnn.frame_size
@@ -234,25 +230,32 @@ def main():
                     final_frame_state,
                     training=True,
                 )
-                target_output_rnn = encoded_rnn[:, BIG_FRAME_SIZE:, :]
-                target_output_rnn = tf.reshape(
-                  target_output_rnn, [-1, Q_LEVELS])
+                target = tf.reshape(encoded_rnn[:, BIG_FRAME_SIZE:, :], [-1, Q_LEVELS])
                 prediction = tf.reshape(raw_output, [-1, Q_LEVELS])
                 cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
                     logits=prediction,
-                    labels=target_output_rnn,
+                    labels=target,
                 )
                 loss = tf.reduce_mean(cross_entropy)
                 total_loss += loss / rnn_len
                 tf.summary.scalar('loss', loss)
                 writer.flush() # But see https://stackoverflow.com/a/52502679
-                print(i, loss, total_loss)
+                print(i, loss / rnn_len, loss)
             grads = tape.gradient(loss, model.trainable_variables)
             optim.apply_gradients(list(zip(grads, model.trainable_variables)))
+        return total_loss
 
+    for step in range(args.num_steps):
+        if (step-1) % GENERATE_EVERY == 0 and step > GENERATE_EVERY:
+            print('Generating samples...')
+            #generate_and_save_samples(step, model)
+        start_time = time.time()
+        inputs = next(train_iter)
+        loss = train_step(inputs)
+        total_loss += loss / rnn_len
         duration = time.time() - start_time
         template = 'Step {:d}: Loss = {:.3f}, ({:.3f} sec/step)'
-        print(template.format(step, total_loss, duration))
+        print(template.format(step, loss, duration))
 
         if step % args.checkpoint_every == 0:
             checkpoint.save(checkpoint_prefix)
