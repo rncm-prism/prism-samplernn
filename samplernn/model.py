@@ -11,8 +11,8 @@ class SampleRNN(tf.keras.layers.Layer):
                  dim, n_rnn, seq_len, emb_size):
         super(SampleRNN, self).__init__()
         self.batch_size = batch_size
-        self.big_frame_size = frame_sizes[0]
-        self.frame_size = frame_sizes[1]
+        self.big_frame_size = frame_sizes[1]
+        self.frame_size = frame_sizes[0]
         self.q_levels = q_levels
         self.dim = dim
         self.n_rnn = n_rnn
