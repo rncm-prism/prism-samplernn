@@ -47,3 +47,17 @@ def mu_law_decode(output, quantization_channels):
         # Perform inverse of mu-law transformation.
         magnitude = (1 / mu) * ((1 + mu)**abs(signal) - 1)
         return tf.sign(signal) * magnitude
+
+def one_hot_encode(input, batch_size, q_levels):
+    '''One-hot encodes the waveform amplitudes.
+
+    This allows the definition of the network as a categorical distribution
+    over a finite set of possible amplitudes.
+    '''
+    encoded = tf.one_hot(
+        input,
+        depth=q_levels,
+        dtype=tf.float32,
+    )
+    shape = [batch_size, -1, q_levels]
+    return tf.reshape(encoded, shape)

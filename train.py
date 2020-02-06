@@ -10,7 +10,7 @@ import tensorflow as tf
 from samplernn import SampleRNN
 from samplernn import (load_audio, find_files)
 from samplernn import (mu_law_encode, mu_law_decode)
-from samplernn import optimizer_factory
+from samplernn import (optimizer_factory, one_hot_encode)
 
 LOGDIR_ROOT = './logdir'
 CHECKPOINT_EVERY = 5
@@ -25,6 +25,8 @@ MAX_TO_KEEP = 5
 N_SECS = 3
 SAMPLE_RATE = 44100 #22050
 LENGTH = N_SECS * SAMPLE_RATE
+BIG_FRAME_SIZE = 8
+FRAME_SIZE = 2
 SEQ_LEN = 1024
 Q_LEVELS = 256
 DIM = 1024
@@ -123,7 +125,7 @@ def main_dist():
         inputs = tf.convert_to_tensor([inputs])
         inputs = inputs[:, :args.seq_len, :]
         encoded_inputs_rnn = mu_law_encode(inputs, Q_LEVELS)
-        encoded_rnn = model._one_hot(encoded_inputs_rnn)
+        encoded_rnn = one_hot_encode(encoded_inputs_rnn, args.batch_size, Q_LEVELS)
         with tf.GradientTape() as tape:
             raw_output, final_big_frame_state, final_frame_state = model(
                 encoded_inputs_rnn,
@@ -131,7 +133,6 @@ def main_dist():
                 tf.zeros([args.batch_size, args.dim], tf.float32),
                 training=True,
             )
-            BIG_FRAME_SIZE = model.big_frame_rnn.frame_size
             target_output_rnn = encoded_rnn[:, BIG_FRAME_SIZE:, :]
             target_output_rnn = tf.reshape(
                 target_output_rnn, [-1, Q_LEVELS])
@@ -215,7 +216,6 @@ def main():
         total_loss = 0
         final_big_frame_state = tf.zeros([args.batch_size, args.dim], tf.float32)
         final_frame_state = tf.zeros([args.batch_size, args.dim], tf.float32)
-        BIG_FRAME_SIZE = model.big_frame_rnn.frame_size
         audio_len = inputs.shape[1] - BIG_FRAME_SIZE
         bptt_len = args.seq_len - BIG_FRAME_SIZE
         rnn_len = audio_len // bptt_len
@@ -223,8 +223,8 @@ def main():
             with tf.GradientTape() as tape:
                 seq = inputs[:, i : i+args.seq_len, :]
                 encoded_inputs_rnn = mu_law_encode(seq, Q_LEVELS)
-                encoded_rnn = model._one_hot(encoded_inputs_rnn)
-                raw_output, final_big_frame_state, final_frame_state = model(
+                encoded_rnn = one_hot_encode(encoded_inputs_rnn, args.batch_size, Q_LEVELS)
+                (raw_output, final_big_frame_state, final_frame_state) = model(
                     encoded_inputs_rnn,
                     final_big_frame_state,
                     final_frame_state,

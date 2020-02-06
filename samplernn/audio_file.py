@@ -32,16 +32,11 @@ def load_audio(directory, sample_rate, sample_size, silence_threshold):
     print("Corpus length: {} files.".format(len(files)))
     # It does not seem as if os.walk guarantees sort order,
     # so the randomization step is perhaps redundant?
-    randomized_files = randomize_files(files)
-    i = 0
-    for filename in randomized_files:
+    for filename in randomize_files(files):
         audio, _ = librosa.load(filename, sr=sample_rate, mono=True)
         audio = audio.reshape(-1, 1)
-        i+=1
-        #print("Loading corpus entry '{}' ({}/{})".format(filename, i, len(files)))
         print("Loading corpus entry {}".format(filename))
-        audio = preprocess_audio(audio, silence_threshold, sample_size)
-        #yield audio, filename
+        audio = preprocess(audio, silence_threshold, sample_size)
         yield audio
 
 def trim_silence(audio, threshold):
@@ -52,7 +47,7 @@ def trim_silence(audio, threshold):
     # Note: indices can be an empty array, if the whole audio was silence.
     return audio[indices[0]:indices[-1]] if indices.size else audio[0:0]
 
-def preprocess_audio(audio, silence_threshold, sample_size):
+def preprocess(audio, silence_threshold, sample_size):
     if silence_threshold is not None:
         # Remove silence
         audio = trim_silence(audio[:, 0], silence_threshold)
