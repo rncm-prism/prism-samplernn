@@ -4,57 +4,60 @@ import os
 import sys
 import time
 
-import librosa
 import tensorflow as tf
+import numpy as np
 
 from samplernn import SampleRNN
-from samplernn import (load_audio, find_files)
+from samplernn import (load_audio, write_wav, find_files)
 from samplernn import (mu_law_encode, mu_law_decode)
 from samplernn import (optimizer_factory, one_hot_encode)
 
+from dataset import get_dataset
+
+
 LOGDIR_ROOT = './logdir'
-CHECKPOINT_EVERY = 5
-GENERATE_EVERY = 10
+OUTDIR = './generated'
 NUM_STEPS = int(1e5)
-LEARNING_RATE = 1e-3
-SAMPLE_SIZE = 100000
-L2_REGULARIZATION_STRENGTH = 0
-SILENCE_THRESHOLD = None
-MOMENTUM = 0.9
-MAX_TO_KEEP = 5
-N_SECS = 3
-SAMPLE_RATE = 44100 #22050
-LENGTH = N_SECS * SAMPLE_RATE
-BIG_FRAME_SIZE = 8
-FRAME_SIZE = 2
+BATCH_SIZE = 1
+BIG_FRAME_SIZE = 64
+FRAME_SIZE = 16
 SEQ_LEN = 1024
 Q_LEVELS = 256
+Q_ZERO = Q_LEVELS // 2
 DIM = 1024
 N_RNN = 1
-BATCH_SIZE = 1
+EMB_SIZE = 256
+LEARNING_RATE = 1e-3
+MOMENTUM = 0.9
+L2_REGULARIZATION_STRENGTH = 0
+SILENCE_THRESHOLD = None
+OUTPUT_DUR = 3 # Duration of generated audio in seconds
+CHECKPOINT_EVERY = 5
+MAX_CHECKPOINTS = 5
+GENERATE_EVERY = 10
+SAMPLE_RATE = 44100 # Sample rate of generated audio
+MAX_GENERATE_PER_BATCH = 10
 NUM_GPUS = 1
-
-# https://github.com/soroushmehr/sampleRNN_ICLR2017/blob/master/models/three_tier/three_tier.py
-# SEQ_LEN > BIG_FRAME_SIZE > FRAME_SIZE
-# SEQ_LEN should be divisible by BIG_FRAME_SIZE
-# BIG_FRAME_SIZE should be divisible by FRAME_SIZE
-# Number of frames in each truncated BPTT pass = SEQ_LEN / FRAME_SIZE
 
 
 def get_arguments():
-    parser = argparse.ArgumentParser(description='SampleRnn')
+    parser = argparse.ArgumentParser(description='PRiSM TensorFlow SampleRNN')
     parser.add_argument('--data_dir',                   type=str,   required=True,
                                                         help='Path to the directory containing the training data')
     parser.add_argument('--num_gpus',                   type=int,   default=NUM_GPUS, help='Number of GPUs')
     parser.add_argument('--batch_size',                 type=int,   default=BATCH_SIZE, help='Batch size')
     parser.add_argument('--logdir_root',                type=str,   default=LOGDIR_ROOT,
                                                         help='Root directory for training log files')
+    parser.add_argument('--output_dir',                 type=str,   default=OUTDIR,
+                                                        help='Path to the directory for generated audio')
+    parser.add_argument('--output_file_dur',            type=str,   default=OUTPUT_DUR,
+                                                        help='Duration of generated audio files')
     parser.add_argument('--checkpoint_every',           type=int,   default=CHECKPOINT_EVERY)
     parser.add_argument('--num_steps',                  type=int,   default=NUM_STEPS)
     parser.add_argument('--learning_rate',              type=float, default=LEARNING_RATE)
     parser.add_argument('--sample_size',                type=int,   default=SAMPLE_SIZE)
     parser.add_argument('--sample_rate',                type=int,   default=SAMPLE_RATE,
-                                                        help='Sample rate of the training data and generated audio')
+                                                        help='Sample rate of the generated audio')
     parser.add_argument('--l2_regularization_strength', type=float, default=L2_REGULARIZATION_STRENGTH)
     parser.add_argument('--silence_threshold',          type=float, default=SILENCE_THRESHOLD)
     parser.add_argument('--optimizer',                  type=str,   default='adam', choices=optimizer_factory.keys(),
@@ -62,118 +65,71 @@ def get_arguments():
     parser.add_argument('--momentum',                   type=float, default=MOMENTUM)
     parser.add_argument('--seq_len',                    type=int,   default=SEQ_LEN,
                                                         help='Number of samples in each truncated BPTT pass')
-    parser.add_argument('--frame_sizes',                type=int,   required=True, nargs='*',
-                                                        help='Frame sizes in terms of the number of lower tier frames')
+    parser.add_argument('--frame_sizes',                type=int,   default=[FRAME_SIZE, BIG_FRAME_SIZE], nargs='*',
+                                                        help='Number of samples per frame in each tier')
     #parser.add_argument('--q_levels',                   type=int,   default=Q_LEVELS, help='Number of audio quantization bins')
     parser.add_argument('--dim',                        type=int,   default=DIM,
                                                         help='Number of cells in every RNN and MLP layer')
     parser.add_argument('--n_rnn',                      type=int,   default=N_RNN, choices=list(range(1, 6)),
                                                         help='Number of RNN layers in each tier')
-    parser.add_argument('--emb_size',                   type=int,   required=True)
-    parser.add_argument('--max_checkpoints',            type=int,   default=MAX_TO_KEEP)
-    return parser.parse_args()
+    parser.add_argument('--emb_size',                   type=int,   default=EMB_SIZE,
+                                                        help='Size of the embedding layer')
+    parser.add_argument('--max_checkpoints',            type=int,   default=MAX_CHECKPOINTS,
+                                                        help='Maximum number of training checkpoints to keep')
+    parsed_args = parser.parse_args()
+    assert parsed_args.frame_sizes[0] < parsed_args.frame_sizes[1], 'Frame sizes should be specified in ascending order'
+    # The following parameter interdependencies are sourced from the original implementation:
+    # https://github.com/soroushmehr/sampleRNN_ICLR2017/blob/master/models/three_tier/three_tier.py
+    assert parsed_args.seq_len % parsed_args.frame_sizes[1] == 0,\
+        'seq_len should be evenly divisible by tier 2 frame size'
+    assert parsed_args.frame_sizes[1] % parsed_args.frame_sizes[0] == 0,\
+        'Tier 2 frame size should be evenly divisible by tier 1 frame size'
+    return parsed_args
 
 
-def generate_and_save_samples(samples, step, model):
+def generate(model, step, dur, sample_rate, outdir):
+    num_samps = dur * sample_rate
+    samples = np.zeros((model.batch_size, num_samps, 1), dtype='int32')
+    samples[:, :model.big_frame_size, :] = Q_ZERO
+    q_vals = np.arange(Q_LEVELS)
+    for t in range(model.big_frame_size, num_samps):
+        if t % model.big_frame_size == 0:
+            inputs = samples[:, t - model.big_frame_size : t, :].astype('float32')
+            big_frame_outputs = model.big_frame_rnn(
+                inputs,
+                num_steps=1,
+                conditioning_frames=None)
+        if t % model.frame_size == 0:
+            inputs = samples[:, t - model.frame_size : t, :].astype('float32')
+            big_frame_output_idx = (t // model.frame_size) % (
+                model.big_frame_size // model.frame_size
+            )
+            frame_outputs = model.frame_rnn(
+                inputs,
+                num_steps=1,
+                conditioning_frames=big_frame_outputs[:, big_frame_output_idx, :])
+        inputs = samples[:, t - model.frame_size : t, :]
+        frame_output_idx = t % model.frame_size
+        sample_outputs = model.sample_mlp(
+            inputs,
+            conditioning_frames=frame_outputs[:, frame_output_idx, :])
+        sample_outputs = tf.cast(
+            tf.reshape(sample_outputs, [-1, Q_LEVELS]),
+            tf.float64
+        )
+        sample_next_list = []
+        for row in tf.cast(tf.nn.softmax(sample_outputs), tf.float32):
+            samp = np.random.choice(q_vals, p=row)
+            sample_next_list.append(samp)
+        samples[:, t] = np.array(sample_next_list).reshape([-1, 1])
+    template = '{}/step_{}.{}.wav'
     for i in range(model.batch_size):
         samples = samples[i].reshape([-1, 1]).tolist()
-        audio = mu_law_decode(samples, model.q_levels)
-        path = './generated/test_' + str(step)+'_'+str(i)+'.wav'
-        write_wav(path, audio, model.sample_rate)
-        if i >= 10:
-            break
+        audio = mu_law_decode(samples, Q_LEVELS)
+        path = template.format(outdir, str(step), str(i))
+        write_wav(path, audio, sample_rate)
+        if i >= MAX_GENERATE_PER_BATCH: break
 
-def main_dist():
-    args = get_arguments()
-    if not find_files(args.data_dir):
-        raise ValueError("No audio files found in '{}'.".format(args.data_dir))
-    if args.l2_regularization_strength == 0:
-        args.l2_regularization_strength = None
-    logdir = os.path.join(args.logdir_root, 'train')
-    if not os.path.exists(logdir):
-        os.makedirs(logdir)
-
-    dist_strategy = tf.distribute.MirroredStrategy()
-    dataset = tf.data.Dataset.from_generator(
-        # See here for why lambda is required: https://stackoverflow.com/a/56602867
-        lambda: load_audio(args.data_dir, args.sample_rate, args.sample_size, args.silence_threshold),
-        output_types=tf.float32,
-        output_shapes=((None, 1)), # Not sure about the precise value of this...
-    )
-    dataset = dataset.batch(args.batch_size)
-    #[tf.print(batch) for batch in dataset]
-    dist_dataset = dist_strategy.experimental_distribute_dataset(dataset)
-    with dist_strategy.scope():
-        model = SampleRNN(
-            batch_size=args.batch_size,
-            frame_sizes=args.frame_sizes,
-            q_levels=Q_LEVELS, #args.q_levels,
-            dim=args.dim,
-            n_rnn=args.n_rnn,
-            seq_len=args.seq_len,
-            emb_size=args.emb_size,
-        )
-        optim = optimizer_factory[args.optimizer](
-            learning_rate=args.learning_rate,
-            momentum=args.momentum,
-        )
-        checkpoint_prefix = os.path.join(logdir, 'ckpt')
-        checkpoint = tf.train.Checkpoint(optimizer=optim, model=model)
-        writer = tf.summary.create_file_writer(logdir)
-
-    def step_fn(inputs):
-        inputs = tf.convert_to_tensor([inputs])
-        inputs = inputs[:, :args.seq_len, :]
-        encoded_inputs_rnn = mu_law_encode(inputs, Q_LEVELS)
-        encoded_rnn = one_hot_encode(encoded_inputs_rnn, args.batch_size, Q_LEVELS)
-        with tf.GradientTape() as tape:
-            raw_output, final_big_frame_state, final_frame_state = model(
-                encoded_inputs_rnn,
-                tf.zeros([args.batch_size, args.dim], tf.float32),
-                tf.zeros([args.batch_size, args.dim], tf.float32),
-                training=True,
-            )
-            target_output_rnn = encoded_rnn[:, BIG_FRAME_SIZE:, :]
-            target_output_rnn = tf.reshape(
-                target_output_rnn, [-1, Q_LEVELS])
-            prediction = tf.reshape(raw_output, [-1, Q_LEVELS])
-            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
-                logits=prediction,
-                labels=target_output_rnn,
-            )
-            loss = tf.reduce_sum(cross_entropy) / args.seq_len / args.batch_size
-            tf.summary.scalar('loss', loss)
-            writer.flush() # But see https://stackoverflow.com/a/52502679
-        grads = tape.gradient(loss, model.trainable_variables)
-        optim.apply_gradients(list(zip(grads, model.trainable_variables)))
-        return cross_entropy
-
-    with dist_strategy.scope():
-        step = -1
-        for inputs in dist_dataset:
-            step += 1
-            if (step-1) % GENERATE_EVERY == 0 and step > GENERATE_EVERY:
-                print('Generating samples...')
-                #generate_and_save_samples(step, model)
-            start_time = time.time()
-            losses = dist_strategy.experimental_run_v2(
-                step_fn,
-                args=(inputs),
-            )
-            mean_loss = dist_strategy.reduce(
-                tf.distribute.ReduceOp.MEAN,
-                losses,
-                axis=0,
-            )
-
-            duration = time.time() - start_time
-            template = 'Step {:d}: Loss = {:.3f}, ({:.3f} sec/step)'
-            print(template.format(step, mean_loss, duration))
-
-            if step % args.checkpoint_every == 0:
-                checkpoint.save(checkpoint_prefix)
-                print('Storing checkpoint to {} ...'.format(logdir), end="")
-                sys.stdout.flush()
 
 def main():
     args = get_arguments()
@@ -185,13 +141,6 @@ def main():
     if not os.path.exists(logdir):
         os.makedirs(logdir)
 
-    dataset = tf.data.Dataset.from_generator(
-        # See here for why lambda is required: https://stackoverflow.com/a/56602867
-        lambda: load_audio(args.data_dir, args.sample_rate, args.sample_size, args.silence_threshold),
-        output_types=tf.float32,
-        output_shapes=((None, 1)), # Not sure about the precise value of this...
-    )
-    dataset = dataset.repeat().batch(args.batch_size)
     model = SampleRNN(
         batch_size=args.batch_size,
         frame_sizes=args.frame_sizes,
@@ -201,66 +150,78 @@ def main():
         seq_len=args.seq_len,
         emb_size=args.emb_size,
     )
-    optim = optimizer_factory[args.optimizer](
+    opt = optimizer_factory[args.optimizer](
         learning_rate=args.learning_rate,
         momentum=args.momentum,
     )
+
+    overlap = model.big_frame_size
+    dataset = get_dataset(args.data_dir, args.batch_size, args.seq_len, overlap)
+
+    def train_iter():
+        for batch in dataset:
+            reset = True
+            num_samps = len(batch[0])
+            for i in range(0, num_samps, seq_len):
+                seqs = batch[:, i : i+seq_len+overlap]
+                yield (seqs, reset)
+                reset = False
+
     checkpoint_prefix = os.path.join(logdir, 'ckpt')
-    checkpoint = tf.train.Checkpoint(optimizer=optim, model=model)
+    checkpoint = tf.train.Checkpoint(optimizer=opt, model=model)
     writer = tf.summary.create_file_writer(logdir)
+    tf.summary.trace_on(graph=True, profiler=True)
 
-    train_iter = iter(dataset)
-
-    #@tf.function
+    @tf.function
     def train_step(inputs):
-        total_loss = 0
-        final_big_frame_state = tf.zeros([args.batch_size, args.dim], tf.float32)
-        final_frame_state = tf.zeros([args.batch_size, args.dim], tf.float32)
-        audio_len = inputs.shape[1] - BIG_FRAME_SIZE
-        bptt_len = args.seq_len - BIG_FRAME_SIZE
-        rnn_len = audio_len // bptt_len
-        for i in range(0, audio_len, bptt_len):
-            with tf.GradientTape() as tape:
-                seq = inputs[:, i : i+args.seq_len, :]
-                encoded_inputs_rnn = mu_law_encode(seq, Q_LEVELS)
-                encoded_rnn = one_hot_encode(encoded_inputs_rnn, args.batch_size, Q_LEVELS)
-                (raw_output, final_big_frame_state, final_frame_state) = model(
-                    encoded_inputs_rnn,
-                    final_big_frame_state,
-                    final_frame_state,
-                    training=True,
-                )
-                target = tf.reshape(encoded_rnn[:, BIG_FRAME_SIZE:, :], [-1, Q_LEVELS])
-                prediction = tf.reshape(raw_output, [-1, Q_LEVELS])
-                cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
+        with tf.GradientTape() as tape:
+            inputs = mu_law_encode(inputs, Q_LEVELS)
+            encoded_rnn = one_hot_encode(inputs, batch_size, Q_LEVELS)
+            raw_output = model(
+                inputs,
+                training=True,
+            )
+            target = tf.reshape(encoded_rnn[:, model.big_frame_size:, :], [-1, Q_LEVELS])
+            prediction = tf.reshape(raw_output, [-1, Q_LEVELS])
+            loss = tf.reduce_mean(
+                tf.nn.sparse_softmax_cross_entropy_with_logits(
                     logits=prediction,
-                    labels=target,
-                )
-                loss = tf.reduce_mean(cross_entropy)
-                total_loss += loss / rnn_len
-                tf.summary.scalar('loss', loss)
-                writer.flush() # But see https://stackoverflow.com/a/52502679
-                print(i, loss / rnn_len, loss)
-            grads = tape.gradient(loss, model.trainable_variables)
-            optim.apply_gradients(list(zip(grads, model.trainable_variables)))
-        return total_loss
+                    labels=tf.argmax(target, axis=-1)))
+        grads = tape.gradient(loss, model.trainable_variables)
+        grads = tf.clip_by_global_norm(grads, 5.0)
+        opt.apply_gradients(list(zip(grads, model.trainable_variables)))
+        return loss
 
-    for step in range(args.num_steps):
+    for (step, (inputs, reset)) in enumerate(train_iter()):
         if (step-1) % GENERATE_EVERY == 0 and step > GENERATE_EVERY:
             print('Generating samples...')
-            #generate_and_save_samples(step, model)
+            #generate_and_save_samples(model, step, args.output_file_dur, args.sample_rate, args.output_dir)
+
+        #if reset: model.reset_hidden_states()
+
         start_time = time.time()
-        inputs = next(train_iter)
         loss = train_step(inputs)
-        total_loss += loss / rnn_len
+        if reset: model.reset_hidden_states()
+
+        with writer.as_default():
+            tf.summary.scalar('loss', loss, step=step)
+            #writer.flush() # But see https://stackoverflow.com/a/52502679
+
         duration = time.time() - start_time
         template = 'Step {:d}: Loss = {:.3f}, ({:.3f} sec/step)'
         print(template.format(step, loss, duration))
 
-        if step % args.checkpoint_every == 0:
+        if step % 20 == 0:
             checkpoint.save(checkpoint_prefix)
             print('Storing checkpoint to {} ...'.format(logdir), end="")
             sys.stdout.flush()
+        
+        if step == 0:
+            with writer.as_default():
+                tf.summary.trace_export(
+                    name="samplernn_model_trace",
+                    step=0,
+                    profiler_outdir=logdir)
 
 
 if __name__ == '__main__':

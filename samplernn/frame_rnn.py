@@ -13,7 +13,7 @@ class FrameRNN(tf.keras.layers.Layer):
         self.rnn = tf.keras.layers.GRU(
             self.dim,
             return_sequences=True,
-            return_state=True,
+            stateful=True,
             #unroll=True
         )
 
@@ -28,15 +28,17 @@ class FrameRNN(tf.keras.layers.Layer):
             name="upsample",
         )
 
-    def call(self, inputs, num_steps, conditioning_frames, frame_state):
-        (batch_size, _, _) = tf.shape(inputs)
+    def call(self, inputs, num_steps, conditioning_frames):
+        # When running in tf.function mode this type of assignment caused an error
+        # (batch_size, _, _) = tf.shape(inputs)
+        batch_size = tf.shape(inputs)[0]
 
         input_frames = tf.reshape(inputs, [
             batch_size,
-            num_steps,
+            tf.shape(inputs)[1] // self.frame_size, #num_steps,
             self.frame_size
         ])
-        input_frames = ( (input_frames / self.q_levels/2.0) - 1.0 ) * 2.0
+        input_frames = ( (input_frames / (self.q_levels / 2.0)) - 1.0 ) * 2.0
 
         input_frames = tf.nn.conv1d(
             input_frames,
@@ -48,7 +50,7 @@ class FrameRNN(tf.keras.layers.Layer):
         if conditioning_frames is not None:
             input_frames += conditioning_frames
 
-        (frame_outputs, frame_state) = self.rnn(input_frames, frame_state)
+        frame_outputs = self.rnn(input_frames)
 
         output_shape = [
             batch_size,
@@ -56,10 +58,10 @@ class FrameRNN(tf.keras.layers.Layer):
             self.dim
         ]
         frame_outputs = tf.nn.conv1d_transpose(
-            input_frames,
+            frame_outputs,
             self.upsample,
             strides=self.num_lower_tier_frames,
             output_shape=output_shape,
         )
 
-        return frame_outputs, frame_state
+        return frame_outputs

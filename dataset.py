@@ -2,28 +2,25 @@ import numpy as np
 import tensorflow as tf
 from samplernn import load_audio
 
-# Converting just the output array makes this incredibly slow, but
-# also converting each piece massively improves performance...
-# See https://github.com/tensorflow/tensorflow/issues/27692 and
-# https://github.com/tensorflow/tensorflow/issues/27692#issuecomment-486619864
-def process_pieces(audio, sample_size):
-    pieces = []
-    idx = 0
-    while idx + sample_size <= len(audio):
-        piece = audio[idx:idx+sample_size, :]
-        pieces.append(np.array(piece))
-        idx += sample_size
-    return np.array(pieces)
 
-def get_dataset(data_dir, batch_size, sample_rate, sample_size, silence_threshold):
+def pad_batch(batch, batch_size, seq_len, overlap):
+    num_samps = len(batch[0])
+    padding = ( seq_len - 1 - (num_samps + seq_len - 1) % seq_len ) + overlap
+    padded_batch = np.zeros([batch_size, num_samps + padding, 1], dtype='float32')
+    for (i, samples) in enumerate(batch):
+        padded_batch[i, :len(samples), :] = samples
+    return padded_batch
+
+def get_dataset(data_dir, batch_size, seq_len, overlap):
     dataset = tf.data.Dataset.from_generator(
         # See here for why lambda is required: https://stackoverflow.com/a/56602867
-        lambda: load_audio(data_dir, sample_rate, sample_size, silence_threshold),
+        lambda: load_audio(data_dir),
         output_types=tf.float32,
         output_shapes=((None, 1)), # Not sure about the precise value of this...
     )
-    if sample_size:
-        dataset = dataset.map(lambda audio: tf.py_function(
-            func=process_pieces, inp=[audio, sample_size], Tout=tf.float32
-        )).unbatch()
-    return dataset.batch(batch_size)
+    dataset = dataset.repeat().batch(batch_size)
+    dataset = dataset.map(lambda batch: tf.py_function(
+        func=pad_batch, inp=[batch, batch_size, seq_len, overlap], Tout=tf.float32
+    ))
+    return dataset
+

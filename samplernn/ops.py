@@ -48,6 +48,15 @@ def mu_law_decode(output, quantization_channels):
         magnitude = (1 / mu) * ((1 + mu)**abs(signal) - 1)
         return tf.sign(signal) * magnitude
 
+def linear_quantize(samples, q_levels):
+    '''Floats in (-1, 1) to ints in [0, q_levels-1]'''
+    epsilon = 1e-2
+    out = samples.copy()
+    out -= out.min(axis=-1)
+    out *= ((q_levels - epsilon) / out.max(axis=-1))
+    out += epsilon / 2
+    return out.astype('int32')
+
 def one_hot_encode(input, batch_size, q_levels):
     '''One-hot encodes the waveform amplitudes.
 

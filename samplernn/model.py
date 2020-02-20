@@ -41,32 +41,36 @@ class SampleRNN(tf.keras.layers.Layer):
         )
 
         self.sample_mlp = SampleMLP(
-            #self.frame_sizes[0], self.dim, self.q_levels, self.emb_size
-            self.dim, self.q_levels, self.emb_size
+            self.frame_size, self.dim, self.q_levels, self.emb_size
+            #self.dim, self.q_levels, self.emb_size
         )
 
-    def call(self, inputs, train_big_frame_state, train_frame_state):
+    def reset_hidden_states(self):
+        self.big_frame_rnn.rnn.reset_states()
+        self.frame_rnn.rnn.reset_states()
+
+    def call(self, inputs):
         # UPPER TIER
-        (big_frame_outputs, final_big_frame_state) = self.big_frame_rnn(
+        big_frame_outputs = self.big_frame_rnn(
             tf.cast(inputs, tf.float32)[
                 :,
                 :-self.big_frame_size,
                 :
             ],
-            num_steps=(self.seq_len-self.big_frame_size) // self.big_frame_size,
+            #num_steps=(self.seq_len-self.big_frame_size) // self.big_frame_size,
+            num_steps=self.seq_len // self.big_frame_size,
             conditioning_frames=None,
-            frame_state=train_big_frame_state,
         )
         # MIDDLE TIER
-        (frame_outputs, final_frame_state) = self.frame_rnn(
+        frame_outputs = self.frame_rnn(
             tf.cast(inputs, tf.float32)[
                 :,
                 self.big_frame_size - self.frame_size: -self.frame_size,
                 :
             ],
-            num_steps=(self.seq_len-self.big_frame_size) // self.frame_size,
+            #num_steps=(self.seq_len-self.big_frame_size) // self.frame_size,
+            num_steps=self.seq_len // self.frame_size,
             conditioning_frames=big_frame_outputs,
-            frame_state=train_frame_state,
         )
         # LOWER TIER (SAMPLES)
         sample_output = self.sample_mlp(
@@ -77,4 +81,4 @@ class SampleRNN(tf.keras.layers.Layer):
             ],
             conditioning_frames=frame_outputs,
         )
-        return sample_output, final_big_frame_state, final_frame_state
+        return sample_output
