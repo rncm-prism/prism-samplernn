@@ -171,6 +171,7 @@ def main():
         args.data_dir, args.num_epochs, args.batch_size, args.seq_len, overlap)
 
     def train_iter():
+        seq_len = args.seq_len
         for batch in dataset:
             reset = True
             num_samps = len(batch[0])
@@ -179,7 +180,6 @@ def main():
                 yield (seqs, reset)
                 reset = False
 
-    checkpoint_prefix = os.path.join(logdir, 'ckpt')
     ckpt = tf.train.Checkpoint(optimizer=opt, model=model)
     ckpt_manager = tf.train.CheckpointManager(
         ckpt, directory=logdir, max_to_keep=args.max_checkpoints)
@@ -190,7 +190,7 @@ def main():
     def train_step(inputs):
         with tf.GradientTape() as tape:
             inputs = mu_law_encode(inputs, Q_LEVELS)
-            encoded_rnn = one_hot_encode(inputs, batch_size, Q_LEVELS)
+            encoded_rnn = one_hot_encode(inputs, args.batch_size, Q_LEVELS)
             raw_output = model(
                 inputs,
                 training=True,
@@ -202,7 +202,7 @@ def main():
                     logits=prediction,
                     labels=tf.argmax(target, axis=-1)))
         grads = tape.gradient(loss, model.trainable_variables)
-        grads = tf.clip_by_global_norm(grads, 5.0)
+        #grads = tf.clip_by_global_norm(grads, 5.0)
         opt.apply_gradients(list(zip(grads, model.trainable_variables)))
         return loss
 
@@ -228,8 +228,7 @@ def main():
         print(template.format(step, loss, duration))
 
         if step % args.checkpoint_every == 0:
-            ckpt.save(checkpoint_prefix)
-            print('Storing checkpoint to {} ...'.format(logdir), end="")
+            ckpt_manager.save()
             sys.stdout.flush()
         
         if step == 0:
