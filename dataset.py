@@ -11,14 +11,14 @@ def pad_batch(batch, batch_size, seq_len, overlap):
         padded_batch[i, :len(samples), :] = samples
     return padded_batch
 
-def get_dataset(data_dir, batch_size, seq_len, overlap):
+def get_dataset(data_dir, num_epochs, batch_size, seq_len, overlap):
     dataset = tf.data.Dataset.from_generator(
         # See here for why lambda is required: https://stackoverflow.com/a/56602867
         lambda: load_audio(data_dir),
         output_types=tf.float32,
         output_shapes=((None, 1)), # Not sure about the precise value of this...
     )
-    dataset = dataset.repeat().batch(batch_size)
+    dataset = dataset.repeat(num_epochs).batch(batch_size)
     dataset = dataset.map(lambda batch: tf.py_function(
         func=pad_batch, inp=[batch, batch_size, seq_len, overlap], Tout=tf.float32
     ))

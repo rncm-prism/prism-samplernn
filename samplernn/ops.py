@@ -70,3 +70,7 @@ def one_hot_encode(input, batch_size, q_levels):
     )
     shape = [batch_size, -1, q_levels]
     return tf.reshape(encoded, shape)
+
+# https://discuss.pytorch.org/t/equivalent-to-torch-unsqueeze-in-tensorflow/26379
+def unsqueeze(input, axis=0):
+    return tf.expand_dims(input, axis)

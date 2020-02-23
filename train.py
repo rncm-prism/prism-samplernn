@@ -10,14 +10,14 @@ import numpy as np
 from samplernn import SampleRNN
 from samplernn import (load_audio, write_wav, find_files)
 from samplernn import (mu_law_encode, mu_law_decode)
-from samplernn import (optimizer_factory, one_hot_encode)
+from samplernn import (optimizer_factory, one_hot_encode, unsqueeze)
 
 from dataset import get_dataset
 
 
 LOGDIR_ROOT = './logdir'
 OUTDIR = './generated'
-NUM_STEPS = int(1e5)
+NUM_EPOCHS = 100
 BATCH_SIZE = 1
 BIG_FRAME_SIZE = 64
 FRAME_SIZE = 16
@@ -38,6 +38,8 @@ GENERATE_EVERY = 10
 SAMPLE_RATE = 44100 # Sample rate of generated audio
 MAX_GENERATE_PER_BATCH = 10
 NUM_GPUS = 1
+VAL_PCNT = 0.1
+TEST_PCNT = 0.1
 
 
 def get_arguments():
@@ -52,12 +54,12 @@ def get_arguments():
                                                         help='Path to the directory for generated audio')
     parser.add_argument('--output_file_dur',            type=str,   default=OUTPUT_DUR,
                                                         help='Duration of generated audio files')
-    parser.add_argument('--checkpoint_every',           type=int,   default=CHECKPOINT_EVERY)
-    parser.add_argument('--num_steps',                  type=int,   default=NUM_STEPS)
-    parser.add_argument('--learning_rate',              type=float, default=LEARNING_RATE)
-    parser.add_argument('--sample_size',                type=int,   default=SAMPLE_SIZE)
     parser.add_argument('--sample_rate',                type=int,   default=SAMPLE_RATE,
                                                         help='Sample rate of the generated audio')
+    parser.add_argument('--num_epochs',                 type=int,   default=NUM_EPOCHS,
+                                                        help='Number of training epochs')
+    parser.add_argument('--checkpoint_every',           type=int,   default=CHECKPOINT_EVERY)
+    parser.add_argument('--learning_rate',              type=float, default=LEARNING_RATE)
     parser.add_argument('--l2_regularization_strength', type=float, default=L2_REGULARIZATION_STRENGTH)
     parser.add_argument('--silence_threshold',          type=float, default=SILENCE_THRESHOLD)
     parser.add_argument('--optimizer',                  type=str,   default='adam', choices=optimizer_factory.keys(),
@@ -76,6 +78,10 @@ def get_arguments():
                                                         help='Size of the embedding layer')
     parser.add_argument('--max_checkpoints',            type=int,   default=MAX_CHECKPOINTS,
                                                         help='Maximum number of training checkpoints to keep')
+    parser.add_argument('--val_pcnt',                   type=int,   default=VAL_PCNT,
+                                                        help='Percentage of data to reserve for validation')
+    parser.add_argument('--test_pcnt',                  type=int,   default=TEST_PCNT,
+                                                        help='Percentage of data to reserve for testing')
     parsed_args = parser.parse_args()
     assert parsed_args.frame_sizes[0] < parsed_args.frame_sizes[1], 'Frame sizes should be specified in ascending order'
     # The following parameter interdependencies are sourced from the original implementation:
@@ -107,21 +113,21 @@ def generate(model, step, dur, sample_rate, outdir):
             frame_outputs = model.frame_rnn(
                 inputs,
                 num_steps=1,
-                conditioning_frames=big_frame_outputs[:, big_frame_output_idx, :])
+                conditioning_frames=unsqueeze(big_frame_outputs[:, big_frame_output_idx, :], 1))
         inputs = samples[:, t - model.frame_size : t, :]
         frame_output_idx = t % model.frame_size
         sample_outputs = model.sample_mlp(
             inputs,
-            conditioning_frames=frame_outputs[:, frame_output_idx, :])
+            conditioning_frames=unsqueeze(frame_outputs[:, frame_output_idx, :], 1))
         sample_outputs = tf.cast(
             tf.reshape(sample_outputs, [-1, Q_LEVELS]),
             tf.float64
         )
-        sample_next_list = []
+        generated = []
         for row in tf.cast(tf.nn.softmax(sample_outputs), tf.float32):
             samp = np.random.choice(q_vals, p=row)
-            sample_next_list.append(samp)
-        samples[:, t] = np.array(sample_next_list).reshape([-1, 1])
+            generated.append(samp)
+        samples[:, t] = np.array(generated).reshape([-1, 1])
     template = '{}/step_{}.{}.wav'
     for i in range(model.batch_size):
         samples = samples[i].reshape([-1, 1]).tolist()
@@ -156,7 +162,8 @@ def main():
     )
 
     overlap = model.big_frame_size
-    dataset = get_dataset(args.data_dir, args.batch_size, args.seq_len, overlap)
+    dataset = get_dataset(
+        args.data_dir, args.num_epochs, args.batch_size, args.seq_len, overlap)
 
     def train_iter():
         for batch in dataset:
@@ -168,7 +175,9 @@ def main():
                 reset = False
 
     checkpoint_prefix = os.path.join(logdir, 'ckpt')
-    checkpoint = tf.train.Checkpoint(optimizer=opt, model=model)
+    ckpt = tf.train.Checkpoint(optimizer=opt, model=model)
+    ckpt_manager = tf.train.CheckpointManager(
+        ckpt, directory=logdir, max_to_keep=args.max_checkpoints)
     writer = tf.summary.create_file_writer(logdir)
     tf.summary.trace_on(graph=True, profiler=True)
 
@@ -192,6 +201,8 @@ def main():
         opt.apply_gradients(list(zip(grads, model.trainable_variables)))
         return loss
 
+    ckpt.restore(ckpt_manager.latest_checkpoint)
+
     for (step, (inputs, reset)) in enumerate(train_iter()):
         if (step-1) % GENERATE_EVERY == 0 and step > GENERATE_EVERY:
             print('Generating samples...')
@@ -211,8 +222,8 @@ def main():
         template = 'Step {:d}: Loss = {:.3f}, ({:.3f} sec/step)'
         print(template.format(step, loss, duration))
 
-        if step % 20 == 0:
-            checkpoint.save(checkpoint_prefix)
+        if step % args.checkpoint_every == 0:
+            ckpt.save(checkpoint_prefix)
             print('Storing checkpoint to {} ...'.format(logdir), end="")
             sys.stdout.flush()
         
