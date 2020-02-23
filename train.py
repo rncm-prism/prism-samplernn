@@ -202,7 +202,7 @@ def main():
                     logits=prediction,
                     labels=tf.argmax(target, axis=-1)))
         grads = tape.gradient(loss, model.trainable_variables)
-        #grads = tf.clip_by_global_norm(grads, 5.0)
+        grads, _ = tf.clip_by_global_norm(grads, 5.0)
         opt.apply_gradients(list(zip(grads, model.trainable_variables)))
         return loss
 

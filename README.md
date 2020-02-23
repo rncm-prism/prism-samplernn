@@ -46,8 +46,8 @@ python train.py \
 	--frame_sizes 2 8 \
 	--batch_size 1 \
 	--seq_len 1024 \
-	--optimizer adam
+	--max_checkpoints 2
 ```
 
-Type `python train.py --help` for a list of all available parameters and their default values.
+The only required parameter to the script is `data_dir`. Type `python train.py --help` for a list of all available parameters and their default values.
 
