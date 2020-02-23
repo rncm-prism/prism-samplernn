@@ -52,33 +52,18 @@ class SampleRNN(tf.keras.layers.Layer):
     def call(self, inputs):
         # UPPER TIER
         big_frame_outputs = self.big_frame_rnn(
-            tf.cast(inputs, tf.float32)[
-                :,
-                :-self.big_frame_size,
-                :
-            ],
-            #num_steps=(self.seq_len-self.big_frame_size) // self.big_frame_size,
-            num_steps=self.seq_len // self.big_frame_size,
-            conditioning_frames=None,
+            tf.cast(inputs, tf.float32)[:, : -self.big_frame_size, :],
+            num_steps=self.seq_len // self.big_frame_size
         )
         # MIDDLE TIER
         frame_outputs = self.frame_rnn(
-            tf.cast(inputs, tf.float32)[
-                :,
-                self.big_frame_size - self.frame_size: -self.frame_size,
-                :
-            ],
-            #num_steps=(self.seq_len-self.big_frame_size) // self.frame_size,
+            tf.cast(inputs, tf.float32)[:, self.big_frame_size-self.frame_size : -self.frame_size, :],
             num_steps=self.seq_len // self.frame_size,
             conditioning_frames=big_frame_outputs,
         )
         # LOWER TIER (SAMPLES)
         sample_output = self.sample_mlp(
-            inputs[
-                :,
-                self.big_frame_size - self.frame_size: -1,
-                :
-            ],
+            inputs[:, self.big_frame_size - self.frame_size : -1, :],
             conditioning_frames=frame_outputs,
         )
         return sample_output

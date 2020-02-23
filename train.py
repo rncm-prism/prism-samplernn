@@ -43,44 +43,50 @@ TEST_PCNT = 0.1
 
 
 def get_arguments():
+    def check_positive(value):
+        val = int(value)
+        if val < 1:
+             raise argparse.ArgumentTypeError("%s is not positive" % value)
+        return val
+
     parser = argparse.ArgumentParser(description='PRiSM TensorFlow SampleRNN')
     parser.add_argument('--data_dir',                   type=str,   required=True,
                                                         help='Path to the directory containing the training data')
-    parser.add_argument('--num_gpus',                   type=int,   default=NUM_GPUS, help='Number of GPUs')
-    parser.add_argument('--batch_size',                 type=int,   default=BATCH_SIZE, help='Batch size')
+    parser.add_argument('--num_gpus',                   type=check_positive,   default=NUM_GPUS, help='Number of GPUs')
+    parser.add_argument('--batch_size',                 type=check_positive,   default=BATCH_SIZE, help='Batch size')
     parser.add_argument('--logdir_root',                type=str,   default=LOGDIR_ROOT,
                                                         help='Root directory for training log files')
     parser.add_argument('--output_dir',                 type=str,   default=OUTDIR,
                                                         help='Path to the directory for generated audio')
     parser.add_argument('--output_file_dur',            type=str,   default=OUTPUT_DUR,
                                                         help='Duration of generated audio files')
-    parser.add_argument('--sample_rate',                type=int,   default=SAMPLE_RATE,
+    parser.add_argument('--sample_rate',                type=check_positive,   default=SAMPLE_RATE,
                                                         help='Sample rate of the generated audio')
-    parser.add_argument('--num_epochs',                 type=int,   default=NUM_EPOCHS,
+    parser.add_argument('--num_epochs',                 type=check_positive,   default=NUM_EPOCHS,
                                                         help='Number of training epochs')
-    parser.add_argument('--checkpoint_every',           type=int,   default=CHECKPOINT_EVERY)
+    parser.add_argument('--checkpoint_every',           type=check_positive,   default=CHECKPOINT_EVERY)
     parser.add_argument('--learning_rate',              type=float, default=LEARNING_RATE)
     parser.add_argument('--l2_regularization_strength', type=float, default=L2_REGULARIZATION_STRENGTH)
     parser.add_argument('--silence_threshold',          type=float, default=SILENCE_THRESHOLD)
     parser.add_argument('--optimizer',                  type=str,   default='adam', choices=optimizer_factory.keys(),
                                                         help='Type of training optimizer to use')
     parser.add_argument('--momentum',                   type=float, default=MOMENTUM)
-    parser.add_argument('--seq_len',                    type=int,   default=SEQ_LEN,
+    parser.add_argument('--seq_len',                    type=check_positive,   default=SEQ_LEN,
                                                         help='Number of samples in each truncated BPTT pass')
     parser.add_argument('--frame_sizes',                type=int,   default=[FRAME_SIZE, BIG_FRAME_SIZE], nargs='*',
                                                         help='Number of samples per frame in each tier')
     #parser.add_argument('--q_levels',                   type=int,   default=Q_LEVELS, help='Number of audio quantization bins')
-    parser.add_argument('--dim',                        type=int,   default=DIM,
+    parser.add_argument('--dim',                        type=check_positive,   default=DIM,
                                                         help='Number of cells in every RNN and MLP layer')
-    parser.add_argument('--n_rnn',                      type=int,   default=N_RNN, choices=list(range(1, 6)),
+    parser.add_argument('--n_rnn',                      type=check_positive,   default=N_RNN, choices=list(range(1, 6)),
                                                         help='Number of RNN layers in each tier')
-    parser.add_argument('--emb_size',                   type=int,   default=EMB_SIZE,
+    parser.add_argument('--emb_size',                   type=check_positive,   default=EMB_SIZE,
                                                         help='Size of the embedding layer')
-    parser.add_argument('--max_checkpoints',            type=int,   default=MAX_CHECKPOINTS,
+    parser.add_argument('--max_checkpoints',            type=check_positive,   default=MAX_CHECKPOINTS,
                                                         help='Maximum number of training checkpoints to keep')
-    parser.add_argument('--val_pcnt',                   type=int,   default=VAL_PCNT,
+    parser.add_argument('--val_pcnt',                   type=float,   default=VAL_PCNT,
                                                         help='Percentage of data to reserve for validation')
-    parser.add_argument('--test_pcnt',                  type=int,   default=TEST_PCNT,
+    parser.add_argument('--test_pcnt',                  type=float,   default=TEST_PCNT,
                                                         help='Percentage of data to reserve for testing')
     parsed_args = parser.parse_args()
     assert parsed_args.frame_sizes[0] < parsed_args.frame_sizes[1], 'Frame sizes should be specified in ascending order'
@@ -103,8 +109,7 @@ def generate(model, step, dur, sample_rate, outdir):
             inputs = samples[:, t - model.big_frame_size : t, :].astype('float32')
             big_frame_outputs = model.big_frame_rnn(
                 inputs,
-                num_steps=1,
-                conditioning_frames=None)
+                num_steps=1)
         if t % model.frame_size == 0:
             inputs = samples[:, t - model.frame_size : t, :].astype('float32')
             big_frame_output_idx = (t // model.frame_size) % (
