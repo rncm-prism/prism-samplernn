@@ -175,8 +175,8 @@ def main():
         for batch in dataset:
             reset = True
             num_samps = len(batch[0])
-            for i in range(0, num_samps, seq_len):
-                seqs = batch[:, i : i+seq_len+overlap]
+            for i in range(overlap, num_samps, seq_len):
+                seqs = batch[:, i-overlap : i+seq_len]
                 yield (seqs, reset)
                 reset = False
 
