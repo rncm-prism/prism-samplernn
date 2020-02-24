@@ -45,7 +45,8 @@ class SampleMLP(tf.keras.layers.Layer):
         batch_size = tf.shape(inputs)[0]
 
         inputs = self.embedding(tf.reshape(inputs, [-1]))
-        inputs = self.conv1d(tf.expand_dims(inputs, 0))
+        #inputs = self.conv1d(tf.expand_dims(inputs, 0))
+        inputs = self.conv1d(tf.reshape(inputs, [batch_size, -1, self.q_levels]))
 
         out = inputs + conditioning_frames
         out = tf.reshape(out, [-1, self.dim])
