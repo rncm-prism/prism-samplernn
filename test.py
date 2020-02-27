@@ -49,11 +49,11 @@ def test_conv_transpose(input_size=1024, dim=1024, big_frame_size=64, frame_size
         strides=kernel_size)
 
 
-def test_training(data_dir='./test_chunks', num_epochs=NUM_EPOCHS, num_steps=20, batch_size=1, seq_len=1024):
+def test_training(data_dir='./test_chunks', num_steps=20, batch_size=1, seq_len=1024):
     logdir = './logdir/train/test'
     model = srnn.SampleRNN(frame_sizes=[2,8], batch_size=batch_size, q_levels=Q_LEVELS, dim=1024, n_rnn=1, seq_len=seq_len, emb_size=256)
     overlap = model.big_frame_size
-    dataset = ds.get_dataset(data_dir, num_epochs, batch_size, seq_len, overlap)
+    dataset = ds.get_dataset(data_dir, batch_size, seq_len, overlap)
     opt = tf.optimizers.Adam(learning_rate=1e-3, epsilon=1e-4)
     train_iter = iter(dataset)
 
@@ -136,10 +136,10 @@ def test_subbatcher(dataset, seq_len=1024):
             yield sequences
 
 
-def test_training2(data_dir='./test_chunks', num_epochs=NUM_EPOCHS, batch_size=1, seq_len=1024, logdir='./logdir/train/test2'):
+def test_training2(data_dir='./test_chunks', batch_size=1, seq_len=1024, logdir='./logdir/train/test2'):
     model = srnn.SampleRNN(frame_sizes=[2,8], batch_size=batch_size, q_levels=Q_LEVELS, dim=1024, n_rnn=1, seq_len=seq_len, emb_size=256)
     overlap = model.big_frame_size
-    dataset = ds.get_dataset(data_dir, num_epochs, batch_size, seq_len, overlap)
+    dataset = ds.get_dataset(data_dir, batch_size, seq_len, overlap)
     opt = tf.optimizers.Adam(learning_rate=1e-3, epsilon=1e-4)
     
     def train_iter():
@@ -215,3 +215,47 @@ def get_arguments_test():
     assert parsed_args.frame_sizes[1] % parsed_args.frame_sizes[0] == 0,\
         'Tier 2 frame size should be evenly divisible by tier 1 frame size'
     return parsed_args
+
+###############################################################################
+
+def pad_batch(batch, batch_size, seq_len, overlap):
+    num_samps = len(batch[0])
+    padding = ( seq_len - 1 - (num_samps + seq_len - 1) % seq_len ) + overlap
+    padded_batch = np.zeros([batch_size, num_samps + padding, 1], dtype='float32')
+    for (i, samples) in enumerate(batch):
+        padded_batch[i, :len(samples), :] = samples
+    return padded_batch
+
+def get_epoch_dataset(data_dir, batch_size, seq_len, overlap):
+    dataset = tf.data.Dataset.from_generator(
+        # See here for why lambda is required: https://stackoverflow.com/a/56602867
+        lambda: srnn.load_audio(data_dir),
+        output_types=tf.float32,
+        output_shapes=((None, 1)), # Not sure about the precise value of this...
+    )
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.map(lambda batch: tf.py_function(
+        func=pad_batch, inp=[batch, batch_size, seq_len, overlap], Tout=tf.float32
+    ))
+    return dataset
+
+def epoch_test(data_dir='./test_chunks', num_epochs=2, batch_size=1, seq_len=65536, overlap=256):
+    dataset = get_epoch_dataset(data_dir, batch_size, seq_len, overlap)
+
+    def test_iter():
+        for batch in dataset:
+            reset = True
+            num_samps = len(batch[0])
+            for i in range(overlap, num_samps, seq_len):
+                seqs = batch[:, i-overlap : i+seq_len]
+                yield (seqs, reset)
+                reset = False
+
+    template = 'epoch: {}, step: {}, batch: {}, reset: {}'
+    for epoch in range(num_epochs):
+        batch = -1
+        for (step, (inputs, reset)) in enumerate(test_iter()):
+            if reset==True:
+                batch += 1
+            print(template.format(epoch, step, batch, reset))
+

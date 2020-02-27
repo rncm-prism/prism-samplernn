@@ -37,12 +37,21 @@ MAX_CHECKPOINTS = 5
 GENERATE_EVERY = 10
 SAMPLE_RATE = 44100 # Sample rate of generated audio
 MAX_GENERATE_PER_BATCH = 10
-NUM_GPUS = 1
+RESUME = True
 VAL_PCNT = 0.1
 TEST_PCNT = 0.1
 
 
 def get_arguments():
+    def check_bool(value):
+        val = str(value).upper()
+        if 'TRUE'.startswith(val):
+            return True
+        elif 'FALSE'.startswith(val):
+            return False
+        else:
+           raise ValueError('Argument is neither `True` nor `False`')
+
     def check_positive(value):
         val = int(value)
         if val < 1:
@@ -50,43 +59,44 @@ def get_arguments():
         return val
 
     parser = argparse.ArgumentParser(description='PRiSM TensorFlow SampleRNN')
-    parser.add_argument('--data_dir',                   type=str,   required=True,
+    parser.add_argument('--data_dir',                   type=str,            required=True,
                                                         help='Path to the directory containing the training data')
-    parser.add_argument('--num_gpus',                   type=check_positive,   default=NUM_GPUS, help='Number of GPUs')
-    parser.add_argument('--batch_size',                 type=check_positive,   default=BATCH_SIZE, help='Batch size')
-    parser.add_argument('--logdir_root',                type=str,   default=LOGDIR_ROOT,
+    parser.add_argument('--batch_size',                 type=check_positive, default=BATCH_SIZE, help='Batch size')
+    parser.add_argument('--logdir_root',                type=str,            default=LOGDIR_ROOT,
                                                         help='Root directory for training log files')
-    parser.add_argument('--output_dir',                 type=str,   default=OUTDIR,
+    parser.add_argument('--output_dir',                 type=str,            default=OUTDIR,
                                                         help='Path to the directory for generated audio')
-    parser.add_argument('--output_file_dur',            type=str,   default=OUTPUT_DUR,
+    parser.add_argument('--output_file_dur',            type=str,            default=OUTPUT_DUR,
                                                         help='Duration of generated audio files')
-    parser.add_argument('--sample_rate',                type=check_positive,   default=SAMPLE_RATE,
+    parser.add_argument('--sample_rate',                type=check_positive, default=SAMPLE_RATE,
                                                         help='Sample rate of the generated audio')
-    parser.add_argument('--num_epochs',                 type=check_positive,   default=NUM_EPOCHS,
+    parser.add_argument('--num_epochs',                 type=check_positive, default=NUM_EPOCHS,
                                                         help='Number of training epochs')
-    parser.add_argument('--checkpoint_every',           type=check_positive,   default=CHECKPOINT_EVERY)
-    parser.add_argument('--learning_rate',              type=float, default=LEARNING_RATE)
-    parser.add_argument('--l2_regularization_strength', type=float, default=L2_REGULARIZATION_STRENGTH)
-    parser.add_argument('--silence_threshold',          type=float, default=SILENCE_THRESHOLD)
-    parser.add_argument('--optimizer',                  type=str,   default='adam', choices=optimizer_factory.keys(),
+    parser.add_argument('--checkpoint_every',           type=check_positive, default=CHECKPOINT_EVERY)
+    parser.add_argument('--learning_rate',              type=float,          default=LEARNING_RATE)
+    parser.add_argument('--l2_regularization_strength', type=float,          default=L2_REGULARIZATION_STRENGTH)
+    parser.add_argument('--silence_threshold',          type=float,          default=SILENCE_THRESHOLD)
+    parser.add_argument('--optimizer',                  type=str,            default='adam', choices=optimizer_factory.keys(),
                                                         help='Type of training optimizer to use')
-    parser.add_argument('--momentum',                   type=float, default=MOMENTUM)
-    parser.add_argument('--seq_len',                    type=check_positive,   default=SEQ_LEN,
+    parser.add_argument('--momentum',                   type=float,          default=MOMENTUM)
+    parser.add_argument('--seq_len',                    type=check_positive, default=SEQ_LEN,
                                                         help='Number of samples in each truncated BPTT pass')
-    parser.add_argument('--frame_sizes',                type=int,   default=[FRAME_SIZE, BIG_FRAME_SIZE], nargs='*',
+    parser.add_argument('--frame_sizes',                type=int,            default=[FRAME_SIZE, BIG_FRAME_SIZE], nargs='*',
                                                         help='Number of samples per frame in each tier')
-    #parser.add_argument('--q_levels',                   type=int,   default=Q_LEVELS, help='Number of audio quantization bins')
-    parser.add_argument('--dim',                        type=check_positive,   default=DIM,
+    #parser.add_argument('--q_levels',                   type=int,            default=Q_LEVELS, help='Number of audio quantization bins')
+    parser.add_argument('--dim',                        type=check_positive, default=DIM,
                                                         help='Number of cells in every RNN and MLP layer')
-    parser.add_argument('--n_rnn',                      type=check_positive,   default=N_RNN, choices=list(range(1, 6)),
+    parser.add_argument('--n_rnn',                      type=check_positive, default=N_RNN, choices=list(range(1, 6)),
                                                         help='Number of RNN layers in each tier')
-    parser.add_argument('--emb_size',                   type=check_positive,   default=EMB_SIZE,
+    parser.add_argument('--emb_size',                   type=check_positive, default=EMB_SIZE,
                                                         help='Size of the embedding layer')
-    parser.add_argument('--max_checkpoints',            type=check_positive,   default=MAX_CHECKPOINTS,
+    parser.add_argument('--max_checkpoints',            type=check_positive, default=MAX_CHECKPOINTS,
                                                         help='Maximum number of training checkpoints to keep')
-    parser.add_argument('--val_pcnt',                   type=float,   default=VAL_PCNT,
+    parser.add_argument('--resume',                     type=check_bool,     default=RESUME,
+                                                        help='Whether to resume training from the last available checkpoint')
+    parser.add_argument('--val_pcnt',                   type=float,          default=VAL_PCNT,
                                                         help='Percentage of data to reserve for validation')
-    parser.add_argument('--test_pcnt',                  type=float,   default=TEST_PCNT,
+    parser.add_argument('--test_pcnt',                  type=float,          default=TEST_PCNT,
                                                         help='Percentage of data to reserve for testing')
     parsed_args = parser.parse_args()
     assert parsed_args.frame_sizes[0] < parsed_args.frame_sizes[1], 'Frame sizes should be specified in ascending order'
@@ -104,6 +114,8 @@ def generate(model, step, dur, sample_rate, outdir):
     samples = np.zeros((model.batch_size, num_samps, 1), dtype='int32')
     samples[:, :model.big_frame_size, :] = Q_ZERO
     q_vals = np.arange(Q_LEVELS)
+    progress_every = 250
+    start_time = time.time()
     for t in range(model.big_frame_size, num_samps):
         if t % model.big_frame_size == 0:
             inputs = samples[:, t - model.big_frame_size : t, :].astype('float32')
@@ -132,6 +144,10 @@ def generate(model, step, dur, sample_rate, outdir):
         for row in tf.cast(tf.nn.softmax(sample_outputs), tf.float32):
             samp = np.random.choice(q_vals, p=row)
             generated.append(samp)
+        if t % progress_every == 0:
+            to = min(t + progress_every, num_samps)
+            duration = time.time() - start_time
+            print('Generating samples {} - {} of {} (time elapsed: {:.3f})'.format(t, to, num_samps, duration))
         samples[:, t] = np.array(generated).reshape([-1, 1])
     template = '{}/step_{}.{}.wav'
     for i in range(model.batch_size):
@@ -140,6 +156,20 @@ def generate(model, step, dur, sample_rate, outdir):
         path = template.format(outdir, str(step), str(i))
         write_wav(path, audio, sample_rate)
         if i >= MAX_GENERATE_PER_BATCH: break
+    print('Finished generating')
+
+
+def maybe_resume(ckpt_manager, ckpt, logdir):
+    print("Attempting to restore saved checkpoints ...", end="")
+    ckpt.restore(ckpt_manager.latest_checkpoint)
+    if ckpt:
+        #print("  Checkpoint found: {}".format(ckpt.model_checkpoint_path))
+        print("  Restoring...", end="")
+        print(" Done.")
+        return ckpt
+    else:
+        print(" No saved checkpoints found, starting new training session")
+        return None
 
 
 def main():
@@ -167,8 +197,7 @@ def main():
     )
 
     overlap = model.big_frame_size
-    dataset = get_dataset(
-        args.data_dir, args.num_epochs, args.batch_size, args.seq_len, overlap)
+    dataset = get_dataset(args.data_dir, args.batch_size, args.seq_len, overlap)
 
     def train_iter():
         seq_len = args.seq_len
@@ -206,37 +235,39 @@ def main():
         opt.apply_gradients(list(zip(grads, model.trainable_variables)))
         return loss
 
-    ckpt.restore(ckpt_manager.latest_checkpoint)
+    if args.resume==True:
+        ckpt.restore(ckpt_manager.latest_checkpoint)
 
-    for (step, (inputs, reset)) in enumerate(train_iter()):
-        if (step-1) % GENERATE_EVERY == 0 and step > GENERATE_EVERY:
-            print('Generating samples...')
-            #generate_and_save_samples(model, step, args.output_file_dur, args.sample_rate, args.output_dir)
+    for epoch in range(args.num_epochs):
+        batch = -1
+        for (step, (inputs, reset)) in enumerate(train_iter()):
+            if reset==True:
+                batch += 1
+                if batch > 0: model.reset_hidden_states()
+                if (batch-1) % GENERATE_EVERY == 0 and batch > GENERATE_EVERY:
+                    print('Generating samples...')
+                    #generate_and_save_samples(model, step, args.output_file_dur, args.sample_rate, args.output_dir)
 
-        #if reset: model.reset_hidden_states()
+            start_time = time.time()
+            loss = train_step(inputs)
 
-        start_time = time.time()
-        loss = train_step(inputs)
-        if reset: model.reset_hidden_states()
+            duration = time.time() - start_time
+            template = 'Epoch: {:d}, Step: {:d}, Loss: {:.3f}, ({:.3f} sec/step)'
+            print(template.format(epoch, step, loss, duration))
 
-        with writer.as_default():
-            tf.summary.scalar('loss', loss, step=step)
-            #writer.flush() # But see https://stackoverflow.com/a/52502679
-
-        duration = time.time() - start_time
-        template = 'Step {:d}: Loss = {:.3f}, ({:.3f} sec/step)'
-        print(template.format(step, loss, duration))
-
-        if step % args.checkpoint_every == 0:
-            ckpt_manager.save()
-            sys.stdout.flush()
-        
-        if step == 0:
             with writer.as_default():
-                tf.summary.trace_export(
-                    name="samplernn_model_trace",
-                    step=0,
-                    profiler_outdir=logdir)
+                tf.summary.scalar('loss', loss, step=step)
+
+            if step % args.checkpoint_every == 0:
+                ckpt_manager.save()
+                sys.stdout.flush()
+            
+            if epoch == 0 and step == 0:
+                with writer.as_default():
+                    tf.summary.trace_export(
+                        name="samplernn_model_trace",
+                        step=0,
+                        profiler_outdir=logdir)
 
 
 if __name__ == '__main__':
