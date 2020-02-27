@@ -144,10 +144,11 @@ def generate(model, step, dur, sample_rate, outdir):
         for row in tf.cast(tf.nn.softmax(sample_outputs), tf.float32):
             samp = np.random.choice(q_vals, p=row)
             generated.append(samp)
-        if t % progress_every == 0:
-            to = min(t + progress_every, num_samps)
+        start = t - model.big_frame_size
+        if start % progress_every == 0:
+            end = min(start + progress_every, num_samps)
             duration = time.time() - start_time
-            print('Generating samples {} - {} of {} (time elapsed: {:.3f})'.format(t, to, num_samps, duration))
+            print('Generating samples {} - {} of {} (time elapsed: {:.3f})'.format(start+1, end, num_samps, duration))
         samples[:, t] = np.array(generated).reshape([-1, 1])
     template = '{}/step_{}.{}.wav'
     for i in range(model.batch_size):
@@ -155,8 +156,9 @@ def generate(model, step, dur, sample_rate, outdir):
         audio = mu_law_decode(samples, Q_LEVELS)
         path = template.format(outdir, str(step), str(i))
         write_wav(path, audio, sample_rate)
+        print('Generated sample output to {}'.format(path))
         if i >= MAX_GENERATE_PER_BATCH: break
-    print('Finished generating')
+    print('Done')
 
 
 def maybe_resume(ckpt_manager, ckpt, logdir):
