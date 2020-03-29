@@ -1,12 +1,14 @@
 # PRiSM SampleRNN  
 
-PRiSM implementation of [SampleRNN: An Unconditional End-to-End Neural Audio Generation Model](https://arxiv.org/abs/1612.07837), using TensorFlow 2.
+[PRiSM](https://www.rncm.ac.uk/research/research-centres-rncm/prism/) implementation of [SampleRNN: An Unconditional End-to-End Neural Audio Generation Model](https://arxiv.org/abs/1612.07837), using [TensorFlow 2](https://www.tensorflow.org/overview).
 
 ## Features
 
 - Three-tier architecture
 - GRU cell RNN
 - Choice of mu-law or linear quantization
+- Seeding of generated audio
+- Sampling temperature control
 
 ## Requirements
 - TensorFlow 2
@@ -96,7 +98,7 @@ Model parameters are specified through a JSON configuration file, which may be p
 | `dim`                    | RNN hidden layer dimensionality          | 1024         | 
 | `num_rnn_layers`         | Depth of the RNN in each of the two upper tiers           | 4          |
 | `q_type`                 | Quantization type (`mu-law` or `linear`)          | `mu-law`          |
-| `q_levels`               | Number of quantization channels (note that if `q_type` is `mu-law` this parameter is ignored, as Mu-Law quantization requires 256 channels)     | 256           |
+| `q_levels`               | Number of quantization channels (note that if `q_type` is `mu-law` this parameter is ignored, as mu-law quantization requires 256 channels)     | 256           |
 | `emb_size`               | Size of the embedding layer in the bottom tier (sample-level MLP)         | 256          |
 
 ## Generating Audio
@@ -107,12 +109,12 @@ To generate audio from a trained model use the generate.py script:
 python generate.py \
   --output_path ./generated/test.wav \
   --checkpoint_path ./logdir/test/predict/ckpt-0 \
+  --config_file ./default.json \
   --num_seqs 2 \
   --dur 1 \
   --sample_rate 16000 \
   --seed './path/to/seed.wav' \
-  --seed_offset 500 \
-  --config_file ./default.json
+  --seed_offset 500
 ```
 
 The model to generate from is specified by the path to an available epoch checkpoint. The generation stage must use the same parameters as the trained model, contained in a JSON config file.
@@ -120,3 +122,17 @@ The model to generate from is specified by the path to an available epoch checkp
 Use the `--num_seqs` parameter to specify the number of audio sequences to generate. Sequences are generated in parallel in a batch, so for large values for `--num_seqs` the operation will be faster than real time.
 
 To seed the generation pass an audio file as the `--seed` parameter. An offset into the file (in samples) may be specified using `--seed_offset`. Note that the size of the seed audio is truncated to the large frame size set during training (64 samples by default).
+
+The following is the full list of command line parameters for generate.py:
+
+| Parameter Name             | Description           | Default Value  | Required?   |
+| ---------------------------|-----------------------|----------------| -----------|
+| `output_path`              | Path to the generated .wav file          | None           | Yes        |
+| `checkpoint_path`          | Path to a saved checkpoint for the model           | None           | Yes        |
+| `config_file`              | Path to the JSON config for the model          | None           | Yes        |
+| `dur`                      | Duration of generated audio           | 3           | No       |
+| `num_seqs`                 | Number of audio sequences to generate          | 1           | No        |
+| `sample_rate`              | Sample rate of the generated audio          | 44100           | No        |
+| `temperature`              | Sampling temperature for generated audio | 0.95         | No        |
+| `seed`                     | Path to audio for seeding when generating audio | None         | No        |
+| `seed_offset`              | Starting offset of the seed audio | 0         | No        |
