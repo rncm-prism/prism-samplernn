@@ -136,3 +136,13 @@ The following is the full list of command line parameters for generate.py:
 | `temperature`              | Sampling temperature for generated audio | 0.95         | No        |
 | `seed`                     | Path to audio for seeding when generating audio | None         | No        |
 | `seed_offset`              | Starting offset of the seed audio | 0         | No        |
+
+## Resources
+
+The following is a list of resources providing further information on SampleRNN, and related work:
+
+- [SampleRNN: An Unconditional End-to-End Neural Audio Generation Model](https://arxiv.org/abs/1612.07837) (the original SampleRNN paper)
+- [Reference implementation](https://github.com/soroushmehr/sampleRNN_ICLR2017) from the authors of the original paper
+- [Generating Albums with SampleRNN to Imitate Metal, Rock, and Punk Bands](https://arxiv.org/pdf/1811.06633.pdf) (Dadabots)
+- [Generating Music with WaveNet and SampleRNN](https://karlhiner.com/music_generation/wavenet_and_samplernn/)
+- [Recurrent Neural Networks (RNN) with TensorFlow / Keras](https://www.tensorflow.org/guide/keras/rnn#build_a_rnn_model_with_nested_inputoutput)
