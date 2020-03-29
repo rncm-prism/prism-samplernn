@@ -1,8 +1,3 @@
-/Include
-/Lib
-/Scripts
-/tcl
-/datasets
 /logdir/*
 pip-selfcheck.json
 __pycache__
