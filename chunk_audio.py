@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser(description='Split an input .wav file into chun
 parser.add_argument('input_file', type=str, help='Path to the input .wav file')
 parser.add_argument('output_path', type=str, help='Output path for the chunks')
 parser.add_argument('--chunk_length', type=int, default=8000, help='Output chunk size in milliseconds')
-parser.add_argument('--overlap', type=int, default=4000, help='Overlap between consecutive chunks in milliseconds')
+parser.add_argument('--overlap', type=int, default=0, help='Overlap between consecutive chunks in milliseconds')
 
 args = parser.parse_args()
 

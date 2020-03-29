@@ -12,7 +12,7 @@ from importlib import reload
 # python train.py --data_dir=./test_chunks --silence_threshold=0.1 --sample_size=102408 --big_frame_size=8 --frame_size=2 --q_levels=256 --rnn_type=GRU --dim=1024 --n_rnn=1 --seq_len=520 --emb_size=256 --batch_size=1 --optimizer=adam
 
 # To run train.py:
-# python train.py --data_dir=./test_chunks
+# python train.py --data_dir ./22k_full --id test --num_epochs 2 --batch_size 1 --max_checkpoints 2 --output_file_dur 1 --sample_rate 22050
 
 
 NUM_EPOCHS = 1
@@ -27,7 +27,7 @@ def get_test_input(data_dir, model):
     return srnn.mu_law_encode(batches[:, :input_seq_len, :], Q_LEVELS)
 
 def test_model(data_dir='./kalamata_you_chunks', frame_sizes=[FRAME_SIZE, BIG_FRAME_SIZE], seq_len=1024):
-    model = srnn.SampleRNN(frame_sizes=frame_sizes, batch_size=1, q_levels=256, dim=1024, n_rnn=1, seq_len=seq_len, emb_size=256)
+    model = srnn.SampleRNN(frame_sizes=frame_sizes, batch_size=1, q_levels=256, dim=1024, num_rnn_layers=1, seq_len=seq_len, emb_size=256)
     encoded_inputs_rnn = get_test_input(data_dir, model)
     return model(encoded_inputs_rnn)
 
@@ -51,7 +51,7 @@ def test_conv_transpose(input_size=1024, dim=1024, big_frame_size=64, frame_size
 
 def test_training(data_dir='./test_chunks', num_steps=20, batch_size=1, seq_len=1024):
     logdir = './logdir/train/test'
-    model = srnn.SampleRNN(frame_sizes=[2,8], batch_size=batch_size, q_levels=Q_LEVELS, dim=1024, n_rnn=1, seq_len=seq_len, emb_size=256)
+    model = srnn.SampleRNN(frame_sizes=[2,8], batch_size=batch_size, q_levels=Q_LEVELS, dim=1024, num_rnn_layers=1, seq_len=seq_len, emb_size=256)
     overlap = model.big_frame_size
     dataset = ds.get_dataset(data_dir, batch_size, seq_len, overlap)
     opt = tf.optimizers.Adam(learning_rate=1e-3, epsilon=1e-4)
@@ -137,7 +137,7 @@ def test_subbatcher(dataset, seq_len=1024):
 
 
 def test_training2(data_dir='./test_chunks', batch_size=1, seq_len=1024, logdir='./logdir/train/test2'):
-    model = srnn.SampleRNN(frame_sizes=[2,8], batch_size=batch_size, q_levels=Q_LEVELS, dim=1024, n_rnn=1, seq_len=seq_len, emb_size=256)
+    model = srnn.SampleRNN(frame_sizes=[2,8], batch_size=batch_size, q_levels=Q_LEVELS, dim=1024, num_rnn_layers=1, seq_len=seq_len, emb_size=256)
     overlap = model.big_frame_size
     dataset = ds.get_dataset(data_dir, batch_size, seq_len, overlap)
     opt = tf.optimizers.Adam(learning_rate=1e-3, epsilon=1e-4)

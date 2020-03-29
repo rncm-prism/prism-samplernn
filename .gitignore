@@ -3,7 +3,7 @@
 /Scripts
 /tcl
 /datasets
-/logdir/train/*
+/logdir/*
 pip-selfcheck.json
 __pycache__
 *.wav

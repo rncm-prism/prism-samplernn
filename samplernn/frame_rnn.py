@@ -3,28 +3,36 @@ import tensorflow as tf
 
 class FrameRNN(tf.keras.layers.Layer):
 
-    def __init__(self, frame_size, num_lower_tier_frames, n_rnn, dim, q_levels):
+    def __init__(self, frame_size, num_lower_tier_frames, num_layers, dim, q_levels):
         super(FrameRNN, self).__init__()
         self.frame_size = frame_size
         self.num_lower_tier_frames = num_lower_tier_frames
-        self.n_rnn = n_rnn
+        self.num_layers = num_layers
         self.dim = dim
         self.q_levels = q_levels
-        self.rnn = tf.keras.layers.GRU(
-            self.dim,
-            return_sequences=True,
-            stateful=True,
-            #unroll=True
-        )
+        if self.num_layers > 1:
+            cells = [tf.keras.layers.GRUCell(self.dim) for _ in range(0, self.num_layers)]
+            self.rnn = tf.keras.layers.RNN(
+                cells,
+                return_sequences=True,
+                stateful=True
+            )
+        else:
+            self.rnn = tf.keras.layers.GRU(
+                self.dim,
+                return_sequences=True,
+                stateful=True,
+            )
 
     def build(self, input_shape):
-        initializer = tf.initializers.GlorotNormal()
         self.conv1d = tf.Variable(
-            initializer(shape=[1, self.frame_size, self.dim]),
+            tf.initializers.GlorotNormal()(
+                shape=[1, self.frame_size, self.dim]),
             name="conv1d",
         )
         self.upsample = tf.Variable(
-            initializer(shape=[self.num_lower_tier_frames, self.dim, self.dim]),
+            tf.initializers.GlorotNormal()(
+                shape=[self.num_lower_tier_frames, self.dim, self.dim]),
             name="upsample",
         )
 

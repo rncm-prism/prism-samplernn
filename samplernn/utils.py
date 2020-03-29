@@ -2,26 +2,6 @@ from __future__ import division
 import tensorflow as tf
 
 
-def create_adam_optimizer(learning_rate, momentum):
-    return tf.optimizers.Adam(learning_rate=learning_rate,
-                              epsilon=1e-4)
-
-
-def create_sgd_optimizer(learning_rate, momentum):
-    return tf.optimizers.SGD(learning_rate=learning_rate,
-                             momentum=momentum)
-
-
-def create_rmsprop_optimizer(learning_rate, momentum):
-    return tf.optimizers.RMSprop(learning_rate=learning_rate,
-                                 momentum=momentum,
-                                 epsilon=1e-5)
-
-
-optimizer_factory = {'adam': create_adam_optimizer,
-                     'sgd': create_sgd_optimizer,
-                     'rmsprop': create_rmsprop_optimizer}
-
 
 def mu_law_encode(audio, quantization_channels):
     '''Quantizes waveform amplitudes.'''
@@ -50,12 +30,36 @@ def mu_law_decode(output, quantization_channels):
 
 def linear_quantize(samples, q_levels):
     '''Floats in (-1, 1) to ints in [0, q_levels-1]'''
-    epsilon = 1e-2
-    out = samples.copy()
-    out -= out.min(axis=-1)
-    out *= ((q_levels - epsilon) / out.max(axis=-1))
+    epsilon = 1e-5
+    out = samples.numpy().copy()
+    out -= out.min(axis=1)[:, None]
+    out *= ((q_levels - epsilon) / out.max(axis=1))[:, None]
     out += epsilon / 2
     return out.astype('int32')
+
+def linear_quantize2(samples, q_levels):
+    epsilon = 1e-2
+    out = samples.numpy().copy()
+    out -= out.min(axis=1)[:, None]
+    out /= out.max(axis=1)[:, None]
+    out *= q_levels - epsilon
+    out += epsilon / 2
+    return out.astype('int32')
+
+def linear_dequantize(samples, q_levels):
+    return tf.cast(samples, tf.float32) / (q_levels / 2) - 1
+
+def quantize(data, type='mu-law', q_levels=256):
+    if type=='mu-law':
+        return mu_law_encode(data, 256)
+    elif type=='linear':
+        return linear_quantize(data, q_levels)
+
+def dequantize(data, type='mu-law', q_levels=256):
+    if type=='mu-law':
+        return mu_law_decode(data, 256)
+    elif type=='linear':
+        return linear_dequantize(data, q_levels)
 
 def one_hot_encode(input, batch_size, q_levels):
     '''One-hot encodes the waveform amplitudes.

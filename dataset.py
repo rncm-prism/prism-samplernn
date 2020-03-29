@@ -6,7 +6,8 @@ from samplernn import load_audio
 def pad_batch(batch, batch_size, seq_len, overlap):
     num_samps = len(batch[0])
     padding = ( seq_len - 1 - (num_samps + seq_len - 1) % seq_len ) + overlap
-    padded_batch = np.zeros([batch_size, num_samps + padding, 1], dtype='float32')
+    #padded_batch = np.zeros([batch_size, num_samps + padding, 1], dtype='float32')
+    padded_batch = np.ones([batch_size, num_samps + padding, 1], dtype='float32')
     for (i, samples) in enumerate(batch):
         padded_batch[i, :len(samples), :] = samples
     return padded_batch
