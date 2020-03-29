@@ -113,7 +113,7 @@ python generate.py \
   --num_seqs 2 \
   --dur 1 \
   --sample_rate 16000 \
-  --seed './path/to/seed.wav' \
+  --seed path/to/seed.wav \
   --seed_offset 500
 ```
 
