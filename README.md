@@ -71,7 +71,7 @@ The following table lists the hyper-parameters that may be passed at the command
 | `output_dir`             | Path to the directory for audio generated during training           | ./generated           | No      |
 | `config_file`            | File containing the configuration parameters for the training model. Note that this file must contain valid JSON, and have the `.json` extension. | ./default.json         | No        |
 | `num_epochs`             | Number of epochs to run the training | 100           | No        |
-| `batch_size`             | Size of the mini-batch | 64         | No        |
+| `batch_size`             | Size of the mini-batch. It is recommended that the batch size divide the length of the training corpus without remainder, otherwise the dataset will be truncated to the nearest multiple of the batch size. | 64         | No        |
 | `optimizer`              | TensorFlow optimizer to use for training (`adam`, `sgd` or `rmsprop`) | `adam`        | No        |
 | `learning_rate`          | Learning rate of the training optimizer   | 0.001         | No        |
 | `momentum`               | Momentum of the training optimizer   | 0.9      | No        |
