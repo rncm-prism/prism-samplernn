@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import json
+from platform import system
 
 import tensorflow as tf
 import numpy as np
@@ -16,7 +17,8 @@ from dataset import get_dataset
 from generate import generate
 
 
-LOGDIR_ROOT = './logdir'
+# https://github.com/ibab/tensorflow-wavenet/issues/255
+LOGDIR_ROOT = 'logdir' if system()=='Windows' else './logdir'
 OUTDIR = './generated'
 CONFIG_FILE = './default.json'
 NUM_EPOCHS = 100

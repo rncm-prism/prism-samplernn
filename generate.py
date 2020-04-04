@@ -87,7 +87,7 @@ def generate_and_save_samples(model, path, seed, seed_offset=0, dur=OUTPUT_DUR,
         sample_outputs = model.sample_mlp(
             inputs,
             conditioning_frames=unsqueeze(frame_outputs[:, frame_output_idx, :], 1))
-        sample_outputs = sample_outputs / temperature
+        sample_outputs = tf.math.log(sample_outputs) / temperature
         sample_outputs = tf.reshape(sample_outputs, [-1, q_levels])
         generated = tf.random.categorical(sample_outputs, 1)
         start = t - model.big_frame_size
