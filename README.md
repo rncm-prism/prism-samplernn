@@ -39,7 +39,7 @@ SampleRNN is designed to accept raw audio in the form of .wav files. We therefor
 ```
 python chunk_audio.py <path_to_input_wav> ./chunks/ --chunk_length 8000 --overlap 1000
 ```
-The second argument (required) is the path to the directory to contain the chunks - note the trailing slash (required, otherwise the chunks will be created in the current directory). You will need to create this directory (the above places the chunks in a sub-directory called 'chunks' within the current directory). The script has two optional arguments for setting the chunk_length (defaults to 8000 ms), and an overlap betweem consecutive chunks (defaults to 0 ms, no overlap).
+The second argument (required) is the path to the directory to contain the chunks - note the trailing slash (required, otherwise the chunks will be created in the current directory). You will need to create this directory (the above places the chunks in a sub-directory called 'chunks' within the current directory). The script has two optional arguments for setting the chunk_length (defaults to 8000 ms), and an overlap between consecutive chunks (defaults to 0 ms, no overlap).
 
 ### Running the training script
 

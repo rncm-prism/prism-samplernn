@@ -1,2 +1,2 @@
-tensorflow==2
+tensorflow
 librosa>=0.4.3

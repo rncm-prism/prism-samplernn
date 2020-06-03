@@ -10,7 +10,7 @@ import numpy as np
 import tensorflow as tf
 
 
-warnings.simplefilter("always")
+# warnings.simplefilter("always")
 
 def randomize_files(files):
     files_idx = [i for i in range(len(files))]
