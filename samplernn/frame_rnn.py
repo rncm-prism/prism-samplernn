@@ -68,14 +68,10 @@ class FrameRNN(tf.keras.layers.Layer):
         self.num_layers = num_layers
         self.dim = dim
         self.q_levels = q_levels
+        self.inputs = tf.keras.layers.Dense(self.dim)
         self.rnn = RNN(self.dim, self.num_layers)
 
     def build(self, input_shape):
-        self.conv1d = tf.Variable(
-            tf.initializers.GlorotNormal()(
-                shape=[1, self.frame_size, self.dim]),
-            name="conv1d",
-        )
         self.upsample = tf.Variable(
             tf.initializers.GlorotNormal()(
                 shape=[self.num_lower_tier_frames, self.dim, self.dim]),
@@ -94,12 +90,7 @@ class FrameRNN(tf.keras.layers.Layer):
         ])
         input_frames = ( (input_frames / (self.q_levels / 2.0)) - 1.0 ) * 2.0
 
-        input_frames = tf.nn.conv1d(
-            input_frames,
-            self.conv1d,
-            stride=1,
-            padding="VALID"
-        )
+        input_frames = self.inputs(input_frames)
 
         if conditioning_frames is not None:
             input_frames += conditioning_frames
