@@ -186,7 +186,7 @@ def main():
                 yield (seqs, reset)
                 reset = False
 
-    ckpt = tf.train.Checkpoint(epoch=tf.Variable(0), optimizer=opt, model=model)
+    ckpt = tf.train.Checkpoint(epoch=tf.Variable(1), optimizer=opt, model=model)
     ckpt_manager = tf.train.CheckpointManager(
         ckpt, directory=logdir_train, max_to_keep=args.max_checkpoints)
     writer = tf.summary.create_file_writer(logdir_train)
@@ -223,55 +223,61 @@ def main():
     epoch_start = ckpt.epoch.numpy()
 
     # Training loop
-    for epoch in range(epoch_start, args.num_epochs):
-        ckpt.epoch.assign(epoch)
-        batch = -1
-        for (step, (inputs, reset)) in enumerate(train_iter()):
-            # Reset RNN states at the end of each batch
-            if reset==True:
-                batch += 1
-                if batch > 0: model.reset_states()
+    try:
+        for epoch in range(epoch_start, args.num_epochs + 1):
+            ckpt.epoch.assign(epoch)
+            batch = -1
+            for (step, (inputs, reset)) in enumerate(train_iter()):
+                # Reset RNN states at the end of each batch
+                if reset==True:
+                    batch += 1
+                    if batch > 0: model.reset_states()
 
-            step_start_time = time.time()
+                step_start_time = time.time()
 
-            # Compute training loss and accuracy
-            loss = train_step(inputs)
-            train_acc = train_accuracy.result() * 100
+                # Compute training loss and accuracy
+                loss = train_step(inputs)
+                train_acc = train_accuracy.result() * 100
 
-            # Print step stats
-            step_duration = time.time() - step_start_time
-            template = 'Epoch: {:d}/{:d}, Step: {:d}, Loss: {:.3f}, Accuracy: {:.3f}, ({:.3f} sec/step)'
-            print(template.format(epoch, args.num_epochs, step, loss, train_acc, step_duration))
+                # Print step stats
+                step_duration = time.time() - step_start_time
+                template = 'Epoch: {:d}/{:d}, Step: {:d}, Loss: {:.3f}, Accuracy: {:.3f}, ({:.3f} sec/step)'
+                print(template.format(epoch, args.num_epochs, step, loss, train_acc, step_duration))
 
-            # Write summaries
-            with writer.as_default():
-                tf.summary.scalar('loss', loss, step=step)
-                tf.summary.scalar('accuracy', train_acc, step=step)
-
-            # Checkpoint
-            if step % args.checkpoint_every == 0:
-                ckpt_manager.save()
-
-            if epoch == 0 and step == 0:
+                # Write summaries
                 with writer.as_default():
-                    tf.summary.trace_export(
-                        name="samplernn_model_trace",
-                        step=0,
-                        profiler_outdir=logdir_train)
+                    tf.summary.scalar('loss', loss, step=step)
+                    tf.summary.scalar('accuracy', train_acc, step=step)
 
-        time_elapsed = time.time() - training_start_time
-        print('Time elapsed since start of training: {:.3f} seconds'.format(time_elapsed))
+                # Checkpoint
+                if step % args.checkpoint_every == 0:
+                    ckpt_manager.save()
 
-        # Save model weights for inference model
-        print('Saving checkpoint for epoch {}...'.format(epoch))
-        epoch_ckpt_path = '{}/ckpt-{}'.format(logdir_predict, epoch)
-        model.save_weights(epoch_ckpt_path)
+                if epoch == 0 and step == 0:
+                    with writer.as_default():
+                        tf.summary.trace_export(
+                            name="samplernn_model_trace",
+                            step=0,
+                            profiler_outdir=logdir_train)
 
-        # Generate samples
-        print('Generating samples for epoch {}...'.format(epoch))
-        output_file_path = '{}/{}_epoch_{}.wav'.format(generate_dir, args.id, epoch)
-        generate(output_file_path, epoch_ckpt_path, config, args.max_generate_per_epoch, args.output_file_dur,
-                 args.sample_rate, args.temperature, args.seed, args.seed_offset)
+            time_elapsed = time.time() - training_start_time
+            print('Time elapsed since start of training: {:.3f} seconds'.format(time_elapsed))
+
+            # Save model weights for inference model
+            print('Saving checkpoint for epoch {}...'.format(epoch))
+            epoch_ckpt_path = '{}/ckpt-{}'.format(logdir_predict, epoch)
+            model.save_weights(epoch_ckpt_path)
+
+            # Generate samples
+            print('Generating samples for epoch {}...'.format(epoch))
+            output_file_path = '{}/{}_epoch_{}.wav'.format(generate_dir, args.id, epoch)
+            generate(output_file_path, epoch_ckpt_path, config, args.max_generate_per_epoch, args.output_file_dur,
+                    args.sample_rate, args.temperature, args.seed, args.seed_offset)
+
+    except KeyboardInterrupt:
+        print()
+        print('Keyboard interrupt')
+        print()
 
 
 if __name__ == '__main__':
