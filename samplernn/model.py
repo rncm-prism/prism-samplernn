@@ -1,11 +1,8 @@
 import tensorflow as tf
-from tensorflow.python.ops import math_ops
-from tensorflow.python.ops import embedding_ops
-from .utils import mu_law_encode
 from .sample_mlp import SampleMLP
 from .frame_rnn import FrameRNN
 
-#class SampleRNN(tf.keras.layers.Layer):
+
 class SampleRNN(tf.keras.Model):
 
     def __init__(self, batch_size, frame_sizes, q_levels, q_type,
@@ -20,11 +17,6 @@ class SampleRNN(tf.keras.Model):
         self.num_rnn_layers = num_rnn_layers
         self.seq_len = seq_len
         self.emb_size = emb_size
-
-        #self.frame_rnns = [
-            #FrameRNN(frame_size, self.num_rnn_layers = num_rnn_layers, dim=self.dim, q_levels=self.q_levels)
-            #for frame_size in self.frame_sizes
-        #]
 
         self.big_frame_rnn = FrameRNN(
             frame_size = self.big_frame_size,
@@ -44,19 +36,16 @@ class SampleRNN(tf.keras.Model):
 
         self.sample_mlp = SampleMLP(
             self.frame_size, self.dim, self.q_levels, self.emb_size
-            #self.dim, self.q_levels, self.emb_size
         )
 
     def call(self, inputs):
         # UPPER TIER
         big_frame_outputs = self.big_frame_rnn(
-            tf.cast(inputs, tf.float32)[:, : -self.big_frame_size, :],
-            num_steps=self.seq_len // self.big_frame_size
+            tf.cast(inputs, tf.float32)[:, : -self.big_frame_size, :]
         )
         # MIDDLE TIER
         frame_outputs = self.frame_rnn(
             tf.cast(inputs, tf.float32)[:, self.big_frame_size-self.frame_size : -self.frame_size, :],
-            num_steps=self.seq_len // self.frame_size,
             conditioning_frames=big_frame_outputs,
         )
         # LOWER TIER (SAMPLES)

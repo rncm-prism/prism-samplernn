@@ -13,9 +13,9 @@ from samplernn import (SampleRNN, write_wav, quantize, dequantize, unsqueeze)
 
 
 OUTPUT_DUR = 3 # Duration of generated audio in seconds
-SAMPLE_RATE = 44100 # Sample rate of generated audio
+SAMPLE_RATE = 22050 # Sample rate of generated audio
 NUM_SEQS = 1
-SAMPLING_TEMPERATURE = 0.95
+SAMPLING_TEMPERATURE = 0.75
 SEED_OFFSET = 0
 
 
@@ -78,9 +78,7 @@ def generate_and_save_samples(model, path, seed, seed_offset=0, dur=OUTPUT_DUR,
         # Top tier (runs every big_frame_size steps)
         if t % model.big_frame_size == 0:
             inputs = samples[:, t - model.big_frame_size : t, :].astype('float32')
-            big_frame_outputs = model.big_frame_rnn(
-                inputs,
-                num_steps=1)
+            big_frame_outputs = model.big_frame_rnn(inputs)
 
         # Middle tier (runs every frame_size steps)
         if t % model.frame_size == 0:
@@ -90,7 +88,6 @@ def generate_and_save_samples(model, path, seed, seed_offset=0, dur=OUTPUT_DUR,
             )
             frame_outputs = model.frame_rnn(
                 inputs,
-                num_steps=1,
                 conditioning_frames=unsqueeze(big_frame_outputs[:, big_frame_output_idx, :], 1))
 
         # Sample level tier (runs once per step)
