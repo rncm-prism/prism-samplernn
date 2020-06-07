@@ -25,7 +25,6 @@ NUM_EPOCHS = 100
 BATCH_SIZE = 64
 LEARNING_RATE = 0.001
 MOMENTUM = 0.9
-L2_REGULARIZATION_STRENGTH = 0
 SILENCE_THRESHOLD = None
 OUTPUT_DUR = 3 # Duration of generated audio in seconds
 CHECKPOINT_EVERY = 100
@@ -40,6 +39,7 @@ TEST_PCNT = 0.1
 
 
 def get_arguments():
+
     def check_bool(value):
         val = str(value).upper()
         if 'TRUE'.startswith(val):
@@ -81,7 +81,6 @@ def get_arguments():
                                                         help='Learning rate of training')
     parser.add_argument('--momentum',                   type=float,          default=MOMENTUM,
                                                         help='Optimizer momentum')
-    #parser.add_argument('--l2_regularization_strength', type=float,          default=L2_REGULARIZATION_STRENGTH)
     #parser.add_argument('--silence_threshold',          type=float,          default=SILENCE_THRESHOLD)
     parser.add_argument('--max_checkpoints',            type=check_positive, default=MAX_CHECKPOINTS,
                                                         help='Maximum number of training checkpoints to keep')
@@ -122,20 +121,6 @@ optimizer_factory = {'adam': create_adam_optimizer,
                      'rmsprop': create_rmsprop_optimizer}
 
 
-def maybe_resume(ckpt_manager, ckpt):
-    print("Attempting to restore saved checkpoints ...", end="")
-    latest = ckpt_manager.latest_checkpoint
-    ckpt.restore(latest)
-    if ckpt:
-        print("  Checkpoint found: {}".format(latest))
-        print("  Restoring...", end="")
-        print(" Done.")
-        return ckpt
-    else:
-        print(" No saved checkpoints found, starting new training session")
-        return None
-
-
 def create_model(batch_size, config):
     seq_len = config['seq_len']
     frame_sizes = config['frame_sizes']
@@ -161,6 +146,7 @@ def create_model(batch_size, config):
 def main():
     args = get_arguments()
 
+    # Create training session directories
     if not find_files(args.data_dir):
         raise ValueError("No audio files found in '{}'.".format(args.data_dir))
     logdir_train = os.path.join(args.logdir_root, args.id, 'train')
@@ -173,12 +159,14 @@ def main():
     if not os.path.exists(generate_dir):
         os.makedirs(generate_dir)
 
+    # Load model configuration
     with open(args.config_file, 'r') as config_file:
         config = json.load(config_file)
     model = create_model(args.batch_size, config)
     q_type = model.q_type
     q_levels = model.q_levels
 
+    # Optimizer
     opt = optimizer_factory[args.optimizer](
         learning_rate=args.learning_rate,
         momentum=args.momentum,
@@ -187,6 +175,7 @@ def main():
     overlap = model.big_frame_size
     dataset = get_dataset(args.data_dir, args.batch_size, model.seq_len, overlap)
 
+    # Dataset iterator
     def train_iter():
         seq_len = model.seq_len
         for batch in dataset:
@@ -203,6 +192,10 @@ def main():
     writer = tf.summary.create_file_writer(logdir_train)
     tf.summary.trace_on(graph=True, profiler=True)
 
+    train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
+        name='train_accuracy')
+
+    # Training step function
     @tf.function
     def train_step(inputs):
         with tf.GradientTape() as tape:
@@ -219,33 +212,43 @@ def main():
         grads = tape.gradient(loss, model.trainable_variables)
         grads, _ = tf.clip_by_global_norm(grads, 5.0)
         opt.apply_gradients(list(zip(grads, model.trainable_variables)))
+        train_accuracy.update_state(target, prediction)
         return loss
 
+    # Maybe resume
     if args.resume==True and ckpt_manager.latest_checkpoint:
         ckpt.restore(ckpt_manager.latest_checkpoint)
 
     training_start_time = time.time()
     epoch_start = ckpt.epoch.numpy()
 
-    #for epoch in range(args.num_epochs):
+    # Training loop
     for epoch in range(epoch_start, args.num_epochs):
         ckpt.epoch.assign(epoch)
         batch = -1
         for (step, (inputs, reset)) in enumerate(train_iter()):
+            # Reset RNN states at the end of each batch
             if reset==True:
                 batch += 1
                 if batch > 0: model.reset_states()
 
             step_start_time = time.time()
+
+            # Compute training loss and accuracy
             loss = train_step(inputs)
+            train_acc = train_accuracy.result() * 100
 
+            # Print step stats
             step_duration = time.time() - step_start_time
-            template = 'Epoch: {:d}, Step: {:d}, Loss: {:.3f}, ({:.3f} sec/step)'
-            print(template.format(epoch, step, loss, step_duration))
+            template = 'Epoch: {:d}/{:d}, Step: {:d}, Loss: {:.3f}, Accuracy: {:.3f}, ({:.3f} sec/step)'
+            print(template.format(epoch, args.num_epochs, step, loss, train_acc, step_duration))
 
+            # Write summaries
             with writer.as_default():
                 tf.summary.scalar('loss', loss, step=step)
+                tf.summary.scalar('accuracy', train_acc, step=step)
 
+            # Checkpoint
             if step % args.checkpoint_every == 0:
                 ckpt_manager.save()
 
@@ -259,9 +262,12 @@ def main():
         time_elapsed = time.time() - training_start_time
         print('Time elapsed since start of training: {:.3f} seconds'.format(time_elapsed))
 
+        # Save model weights for inference model
         print('Saving checkpoint for epoch {}...'.format(epoch))
         epoch_ckpt_path = '{}/ckpt-{}'.format(logdir_predict, epoch)
         model.save_weights(epoch_ckpt_path)
+
+        # Generate samples
         print('Generating samples for epoch {}...'.format(epoch))
         output_file_path = '{}/{}_epoch_{}.wav'.format(generate_dir, args.id, epoch)
         generate(output_file_path, epoch_ckpt_path, config, args.max_generate_per_epoch, args.output_file_dur,
