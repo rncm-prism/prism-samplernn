@@ -5,6 +5,7 @@ import warnings
 
 import librosa
 import soundfile as sf
+from natsort import natsorted
 import copy
 import numpy as np
 import tensorflow as tf
@@ -24,7 +25,7 @@ def find_files(directory, pattern='*.wav'):
     for root, dirnames, filenames in os.walk(directory):
         for filename in fnmatch.filter(filenames, pattern):
             files.append(os.path.join(root, filename))
-    return files
+    return natsorted(files)
 
 def load_audio(directory, batch_size):
     '''Generator that yields audio waveforms from the directory.'''

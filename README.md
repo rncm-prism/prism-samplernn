@@ -1,6 +1,6 @@
 # PRiSM SampleRNN  
 
-[PRiSM](https://www.rncm.ac.uk/research/research-centres-rncm/prism/) implementation of [SampleRNN: An Unconditional End-to-End Neural Audio Generation Model](https://arxiv.org/abs/1612.07837), using [TensorFlow 2](https://www.tensorflow.org/overview).
+[PRiSM](https://www.rncm.ac.uk/research/research-centres-rncm/prism/) implementation of [SampleRNN: An Unconditional End-to-End Neural Audio Generation Model](https://arxiv.org/abs/1612.07837), for [TensorFlow 2](https://www.tensorflow.org/overview).
 
 ## Features
 
@@ -14,16 +14,17 @@
 
 - TensorFlow 2
 - Librosa
+- Natsort
 - Pydub
 
 Note that Pydub is only required for the audio chunking script.
 
 ## Installation
-The simplest way to install is with [Anaconda](https://www.anaconda.com/distribution/). When you have that all set up create a new environment with:
+The simplest way to install is with [Anaconda](https://www.anaconda.com/distribution/). After running the installer for your platform, open a new terminal window or tab so that the `conda` package manager is available on your `PATH`. Then create a new environment with:
 
 `conda create -n prism-samplernn anaconda`
 
-We're naming the environment after the repo, but you can choose whatever name you like. Then activate it with:
+We're naming the environment after the repository, but you can choose whatever name you like. Then activate it with:
 
 `conda activate prism-samplernn`
 
