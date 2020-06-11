@@ -84,7 +84,7 @@ The following table lists the hyper-parameters that may be passed at the command
 | `max_checkpoints`        | Maximum number of training checkpoints to keep   | 5      | No        |
 | `resume`                 | Whether to resume training from the last available checkpoint   | True      | No        |
 | `max_generate_per_epoch` | Maximum number of output files to generate at the end of each epoch   | 1      | No        |
-| `sample_rate`            | Sample rate of the generated audio | 44100         | No        |
+| `sample_rate`            | Sample rate of the generated audio | 22050         | No        |
 | `output_file_dur`        | Duration of generated audio files (in seconds) | 3         | No        |
 | `temperature`            | Sampling temperature for generated audio | 0.95         | No        |
 | `seed`                   | Path to audio for seeding when generating audio | None         | No        |
