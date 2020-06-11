@@ -60,6 +60,8 @@ def get_arguments():
                                                         help='Path to the directory containing the training data')
     parser.add_argument('--id',                         type=str,            required=True,
                                                         help='Id for the current training session')
+    parser.add_argument('--verbose',                    type=check_bool,
+                                                        help='Whether to print training step output to a new line each time (the default), or overwrite the last output')
     parser.add_argument('--batch_size',                 type=check_positive, default=BATCH_SIZE, help='Size of the mini-batch')
     parser.add_argument('--logdir_root',                type=str,            default=LOGDIR_ROOT,
                                                         help='Root directory for training log files')
@@ -241,7 +243,8 @@ def main():
                 # Print step stats
                 step_duration = time.time() - step_start_time
                 template = 'Epoch: {:d}/{:d}, Step: {:d}, Loss: {:.3f}, Accuracy: {:.3f}, ({:.3f} sec/step)'
-                print(template.format(epoch, args.num_epochs, step, loss, train_acc, step_duration))
+                end_char = '\r' if args.verbose==False else '\n'
+                print(template.format(epoch, args.num_epochs, step, loss, train_acc, step_duration), end=end_char)
 
                 # Write summaries
                 with writer.as_default():
