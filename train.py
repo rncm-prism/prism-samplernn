@@ -101,8 +101,7 @@ def get_arguments():
 
 
 def create_adam_optimizer(learning_rate, momentum):
-    return tf.optimizers.Adam(learning_rate=learning_rate,
-                              epsilon=1e-4)
+    return tf.optimizers.Adam(learning_rate=learning_rate)
 
 
 def create_sgd_optimizer(learning_rate, momentum):
@@ -253,12 +252,14 @@ def main():
                 if step % args.checkpoint_every == 0:
                     ckpt_manager.save()
 
-                if epoch == 0 and step == 0:
+                if epoch == 1 and step == 0:
                     with writer.as_default():
                         tf.summary.trace_export(
                             name="samplernn_model_trace",
                             step=0,
                             profiler_outdir=logdir_train)
+
+            train_accuracy.reset_states()
 
             time_elapsed = time.time() - training_start_time
             print('Time elapsed since start of training: {:.3f} seconds'.format(time_elapsed))
