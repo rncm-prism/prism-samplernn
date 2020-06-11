@@ -71,6 +71,7 @@ The following table lists the hyper-parameters that may be passed at the command
 | ---------------------------|-----------------------|----------------| -----------|
 | `id`                     | Id for the training session          | None           | Yes        |
 | `data_dir`               | Path to the directory containing the training data           | None           | Yes        |
+| `verbose`                | Set training output verbosity. If False training step output is overwritten, if True (the default) it is written to a new line.           | None           | No        |
 | `logdir_root`            | Location in which to store training log files and checkpoints. All such files are placed in a subdirectory with the id of the training session.           | ./logdir           | No      |
 | `output_dir`             | Path to the directory for audio generated during training           | ./generated           | No      |
 | `config_file`            | File containing the configuration parameters for the training model. Note that this file must contain valid JSON, and have the `.json` extension. | ./default.json         | No        |
@@ -78,7 +79,7 @@ The following table lists the hyper-parameters that may be passed at the command
 | `batch_size`             | Size of the mini-batch. It is recommended that the batch size divide the length of the training corpus without remainder, otherwise the dataset will be truncated to the nearest multiple of the batch size. | 64         | No        |
 | `optimizer`              | TensorFlow optimizer to use for training (`adam`, `sgd` or `rmsprop`) | `adam`        | No        |
 | `learning_rate`          | Learning rate of the training optimizer   | 0.001         | No        |
-| `momentum`               | Momentum of the training optimizer   | 0.9      | No        |
+| `momentum`               | Momentum of the training optimizer (applies to `sgd` and `rmsprop` only)   | 0.9      | No        |
 | `checkpoint_every`       | Interval (in steps) at which to generate a checkpoint file   | 100      | No        |
 | `max_checkpoints`        | Maximum number of training checkpoints to keep   | 5      | No        |
 | `resume`                 | Whether to resume training from the last available checkpoint   | True      | No        |
