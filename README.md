@@ -11,8 +11,12 @@
 - Sampling temperature control
 
 ## Requirements
+
 - TensorFlow 2
 - Librosa
+- Pydub
+
+Note that Pydub is only required for the audio chunking script.
 
 ## Installation
 The simplest way to install is with [Anaconda](https://www.anaconda.com/distribution/). When you have that all set up create a new environment with:
