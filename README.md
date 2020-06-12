@@ -2,6 +2,23 @@
 
 [PRiSM](https://www.rncm.ac.uk/research/research-centres-rncm/prism/) implementation of [SampleRNN: An Unconditional End-to-End Neural Audio Generation Model](https://arxiv.org/abs/1612.07837), for [TensorFlow 2](https://www.tensorflow.org/overview).
 
+-----------
+### Table of Contents
+
+* [Features](https://github.com/rncm-prism/prism-samplernn#features)
+* [Requirments](https://github.com/rncm-prism/prism-samplernn#requirements)
+* [Installation](https://github.com/rncm-prism/prism-samplernn#installation)
+* [Architecture](https://github.com/rncm-prism/prism-samplernn#architecture)
+* [Training](https://github.com/rncm-prism/prism-samplernn#training)
+    - [Preparing Data](https://github.com/rncm-prism/prism-samplernn#preparing-data)
+    - [Running the Training Script](https://github.com/rncm-prism/prism-samplernn#running-the-training-script)
+    - [Command Line Arguments](https://github.com/rncm-prism/prism-samplernn#command-line-arguments)
+    - [Configuring the Model](https://github.com/rncm-prism/prism-samplernn#configuring-the-model)
+* [Generating Audio](https://github.com/rncm-prism/prism-samplernn#generating-audio)
+* [Resources](https://github.com/rncm-prism/prism-samplernn#resources)
+* [Acknowledgements](https://github.com/rncm-prism/prism-samplernn#acknowledgements)
+-----------
+
 ## Features
 
 - Three-tier architecture
@@ -9,6 +26,8 @@
 - Choice of mu-law or linear quantization
 - Seeding of generated audio
 - Sampling temperature control
+
+-----------
 
 ## Requirements
 
@@ -18,6 +37,8 @@
 - Pydub
 
 Note that Pydub is only required for the audio chunking script.
+
+-----------
 
 ## Installation
 The simplest way to install is with [Anaconda](https://www.anaconda.com/distribution/). After running the installer for your platform, open a new terminal window or tab so that the `conda` package manager is available on your `PATH`. Then create a new environment with:
@@ -32,13 +53,17 @@ Finally run requirements.txt to install the dependencies:
 
 `pip install -r requirements.txt`
 
+-----------
+
 ## Architecture
 
 The architecture of the network conforms to the three-tier design proposed in the original paper, consisting of two upper [RNN](https://www.tensorflow.org/guide/keras/rnn) tiers and a lower [MLP](https://en.wikipedia.org/wiki/Multilayer_perceptron) tier. The two upper tiers operate on frames of samples, while the lower tier is at the level of individual samples.
 
+-----------
+
 ## Training
 
-### Preparing data
+### Preparing Data
 
 SampleRNN is designed to accept raw audio in the form of .wav files. We therefore need to preprocess our source .wav file by slicing it into chunks, using the supplied [chunk_audio.py](https://bitbucket.org/cmelen/prism-samplernn.py/master/chunk_audio.py) script:
 ```
@@ -46,7 +71,7 @@ python chunk_audio.py <path_to_input_wav> ./chunks/ --chunk_length 8000 --overla
 ```
 The second argument (required) is the path to the directory to contain the chunks - note the trailing slash (required, otherwise the chunks will be created in the current directory). You will need to create this directory (the above places the chunks in a sub-directory called 'chunks' within the current directory). The script has two optional arguments for setting the chunk_length (defaults to 8000 ms), and an overlap between consecutive chunks (defaults to 0 ms, no overlap).
 
-### Running the training script
+### Running the Training Script
 
 Assuming your training corpus is stored in a directory named `data` under the present directory, you can run the train.py script as follows:
 
@@ -107,18 +132,20 @@ Model parameters are specified through a JSON configuration file, which may be p
 | `q_levels`               | Number of quantization channels (note that if `q_type` is `mu-law` this parameter is ignored, as mu-law quantization requires 256 channels)     | 256           |
 | `emb_size`               | Size of the embedding layer in the bottom tier (sample-level MLP)         | 256          |
 
+-----------
+
 ## Generating Audio
 
 To generate audio from a trained model use the generate.py script:
 
 ```shell
 python generate.py \
-  --output_path ./generated/test.wav \
-  --checkpoint_path ./logdir/test/predict/ckpt-0 \
+  --output_path path/to/out.wav \
+  --checkpoint_path ./logdir/test/predict/ckpt-100 \
   --config_file ./default.json \
-  --num_seqs 2 \
-  --dur 1 \
-  --sample_rate 16000 \
+  --num_seqs 10 \
+  --dur 10 \
+  --sample_rate 22050 \
   --seed path/to/seed.wav \
   --seed_offset 500
 ```
@@ -143,6 +170,8 @@ The following is the full list of command line parameters for generate.py:
 | `seed`                     | Path to audio for seeding when generating audio | None         | No        |
 | `seed_offset`              | Starting offset of the seed audio | 0         | No        |
 
+-----------
+
 ## Resources
 
 The following is a list of resources providing further information on SampleRNN, and related work:
@@ -152,3 +181,9 @@ The following is a list of resources providing further information on SampleRNN,
 - [Generating Albums with SampleRNN to Imitate Metal, Rock, and Punk Bands](https://arxiv.org/pdf/1811.06633.pdf) (Dadabots)
 - [Generating Music with WaveNet and SampleRNN](https://karlhiner.com/music_generation/wavenet_and_samplernn/)
 - [Recurrent Neural Networks (RNN) with TensorFlow / Keras](https://www.tensorflow.org/guide/keras/rnn#build_a_rnn_model_with_nested_inputoutput)
+
+-----------
+
+## Acknowledgements
+
+Thanks are extended to the rest of the [PRiSM team](https://www.rncm.ac.uk/research/research-centres-rncm/prism/prism-team/) for their help and support during development, and especially to [Dr Sam Salem](https://www.rncm.ac.uk/people/sam-salem/) for his immense patience, diligence and perseverance in testing the code.

@@ -101,6 +101,8 @@ def get_arguments():
                                                         help='Percentage of data to reserve for testing')
     return parser.parse_args()
 
+# Optimizer factory adapted from WaveNet
+# https://github.com/ibab/tensorflow-wavenet/blob/master/wavenet/ops.py
 
 def create_adam_optimizer(learning_rate, momentum):
     return tf.optimizers.Adam(learning_rate=learning_rate)

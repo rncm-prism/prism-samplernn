@@ -10,6 +10,8 @@ import copy
 import numpy as np
 import tensorflow as tf
 
+# Contains some code adapted from WaveNet
+# https://github.com/ibab/tensorflow-wavenet/blob/master/wavenet/audio_reader.py
 
 # warnings.simplefilter("always")
 
@@ -43,14 +45,6 @@ def load_audio(directory, batch_size):
         audio = audio.reshape(-1, 1)
         print("Loading corpus entry {}".format(filename))
         yield audio
-
-def trim_silence(audio, threshold):
-    '''Removes silence at the beginning and end of a sample.'''
-    energy = librosa.feature.rms(audio)
-    frames = np.nonzero(energy > threshold)
-    indices = librosa.core.frames_to_samples(frames)[1]
-    # Note: indices can be an empty array, if the whole audio was silence.
-    return audio[indices[0]:indices[-1]] if indices.size else audio[0:0]
 
 def write_wav(path, audio, sample_rate):
     sf.write(path, np.array(audio), sample_rate)
