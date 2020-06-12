@@ -223,6 +223,10 @@ def main():
     training_start_time = time.time()
     epoch_start = ckpt.epoch.numpy()
 
+    # Track previous epoch so non-verbose output can
+    # be written to a new line when changing epoch
+    prev_epoch = 0
+
     # Training loop
     try:
         for epoch in range(epoch_start, args.num_epochs + 1):
@@ -243,7 +247,7 @@ def main():
                 # Print step stats
                 step_duration = time.time() - step_start_time
                 template = 'Epoch: {:d}/{:d}, Step: {:d}, Loss: {:.3f}, Accuracy: {:.3f}, ({:.3f} sec/step)'
-                end_char = '\r' if args.verbose==False else '\n'
+                end_char = '\r' if (args.verbose == False) and (epoch != prev_epoch) else '\n'
                 print(template.format(epoch, args.num_epochs, step, loss, train_acc, step_duration), end=end_char)
 
                 # Write summaries
@@ -263,6 +267,8 @@ def main():
                             profiler_outdir=logdir_train)
 
             train_accuracy.reset_states()
+
+            prev_epoch = epoch
 
             time_elapsed = time.time() - training_start_time
             print('Time elapsed since start of training: {:.3f} seconds'.format(time_elapsed))
