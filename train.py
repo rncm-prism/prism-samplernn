@@ -1,7 +1,6 @@
 from __future__ import print_function
 import argparse
 import os
-import sys
 import time
 import json
 from platform import system
@@ -9,10 +8,7 @@ from platform import system
 import tensorflow as tf
 import numpy as np
 
-from samplernn import SampleRNN
-from samplernn import (load_audio, write_wav, find_files)
-from samplernn import (quantize, dequantize, unsqueeze)
-
+from samplernn import (SampleRNN, find_files, quantize)
 from dataset import get_dataset
 from generate import generate
 

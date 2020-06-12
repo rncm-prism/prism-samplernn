@@ -61,20 +61,6 @@ def dequantize(data, type='mu-law', q_levels=256):
     elif type=='linear':
         return linear_dequantize(data, q_levels)
 
-def one_hot_encode(input, batch_size, q_levels):
-    '''One-hot encodes the waveform amplitudes.
-
-    This allows the definition of the network as a categorical distribution
-    over a finite set of possible amplitudes.
-    '''
-    encoded = tf.one_hot(
-        input,
-        depth=q_levels,
-        dtype=tf.float32,
-    )
-    shape = [batch_size, -1, q_levels]
-    return tf.reshape(encoded, shape)
-
 # https://discuss.pytorch.org/t/equivalent-to-torch-unsqueeze-in-tensorflow/26379
 def unsqueeze(input, axis=0):
     return tf.expand_dims(input, axis)
