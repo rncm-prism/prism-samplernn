@@ -11,7 +11,8 @@
 * [Architecture](https://github.com/rncm-prism/prism-samplernn#architecture)
 * [Training](https://github.com/rncm-prism/prism-samplernn#training)
     - [Preparing Data](https://github.com/rncm-prism/prism-samplernn#preparing-data)
-    - [Running the Training Script](https://github.com/rncm-prism/prism-samplernn#running-the-training-script)
+    - [Running the Script](https://github.com/rncm-prism/prism-samplernn#running-the-script)
+    - [Statistics](https://github.com/rncm-prism/prism-samplernn#statistics)
     - [Command Line Arguments](https://github.com/rncm-prism/prism-samplernn#command-line-arguments)
     - [Configuring the Model](https://github.com/rncm-prism/prism-samplernn#configuring-the-model)
 * [Generating Audio](https://github.com/rncm-prism/prism-samplernn#generating-audio)
@@ -71,7 +72,7 @@ python chunk_audio.py <path_to_input_wav> ./chunks/ --chunk_length 8000 --overla
 ```
 The second argument (required) is the path to the directory to contain the chunks - note the trailing slash (required, otherwise the chunks will be created in the current directory). You will need to create this directory (the above places the chunks in a sub-directory called 'chunks' within the current directory). The script has two optional arguments for setting the chunk_length (defaults to 8000 ms), and an overlap between consecutive chunks (defaults to 0 ms, no overlap).
 
-### Running the Training Script
+### Running the Script
 
 Assuming your training corpus is stored in a directory named `data` under the present directory, you can run the train.py script as follows:
 
@@ -87,9 +88,9 @@ python train.py \
   --sample_rate 16000
 ```
 
-The current epoch, training step and training loss are printed to the terminal during training. Temporary checkpoints storing the current state of the model are periodically saved to disk during each epoch, with a permanent checkpoint saved at the end of each epoch. An audio file is also generated at the end of an epoch, which may be used to assess the progress of the training.
+Temporary checkpoints storing the current state of the model are periodically saved to disk during each epoch, with a permanent checkpoint saved at the end of each epoch. An audio file is also generated at the end of an epoch, which may be used to assess the progress of the training.
 
-### Training Statistics
+### Statistics
 
 Statistics providing information on the progress of traing are printed to the terminal prompt at each step. For example:
 
