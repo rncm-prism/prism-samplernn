@@ -7,6 +7,7 @@ from platform import system
 
 import tensorflow as tf
 import numpy as np
+import librosa
 
 from samplernn import (SampleRNN, find_files, quantize)
 from dataset import get_dataset
@@ -185,6 +186,13 @@ def main():
                 yield (seqs, reset)
                 reset = False
 
+    def get_steps_per_epoch():
+        files = find_files(args.data_dir)
+        num_batches = len(files) // args.batch_size
+        (samples, _) = librosa.load(files[0], sr=None, mono=False)
+        steps_per_batch = int(np.floor(len(samples) / float(model.seq_len)))
+        return num_batches * steps_per_batch
+
     ckpt = tf.train.Checkpoint(epoch=tf.Variable(1), optimizer=opt, model=model)
     ckpt_manager = tf.train.CheckpointManager(
         ckpt, directory=logdir_train, max_to_keep=args.max_checkpoints)
@@ -220,10 +228,11 @@ def main():
 
     training_start_time = time.time()
     epoch_start = ckpt.epoch.numpy()
-
     # Track previous epoch so non-verbose output can
     # be written to a new line when changing epoch
     prev_epoch = 0
+
+    steps_per_epoch = get_steps_per_epoch()
 
     # Training loop
     try:
@@ -244,9 +253,9 @@ def main():
 
                 # Print step stats
                 step_duration = time.time() - step_start_time
-                template = 'Epoch: {:d}/{:d}, Step: {:d}, Loss: {:.3f}, Accuracy: {:.3f}, ({:.3f} sec/step)'
+                template = 'Epoch: {:d}/{:d}, Step: {:d}/{:d}, Loss: {:.3f}, Accuracy: {:.3f}, ({:.3f} sec/step)'
                 end_char = '\r' if (args.verbose == False) and (epoch != prev_epoch) else '\n'
-                print(template.format(epoch, args.num_epochs, step, loss, train_acc, step_duration), end=end_char)
+                print(template.format(epoch, args.num_epochs, step, steps_per_epoch, loss, train_acc, step_duration), end=end_char)
 
                 # Write summaries
                 with writer.as_default():

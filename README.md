@@ -89,6 +89,14 @@ python train.py \
 
 The current epoch, training step and training loss are printed to the terminal during training. Temporary checkpoints storing the current state of the model are periodically saved to disk during each epoch, with a permanent checkpoint saved at the end of each epoch. An audio file is also generated at the end of an epoch, which may be used to assess the progress of the training.
 
+### Training Statistics
+
+Statistics providing information on the progress of traing are printed to the terminal prompt at each step. For example:
+
+`Epoch: 1/2, Step: 125/1500, Loss: 4.182, Accuracy: 13.418, (0.0357 sec/step)`
+
+The `--verbose` command line argument determines how these statistics are printed - if `True` (the default) each step is printed to a new line, if `False` a new line is taken only at each epoch, with each printed step within an epoch being overwritten.
+
 ### Command Line Arguments
 
 The following table lists the hyper-parameters that may be passed at the command line:
