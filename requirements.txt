@@ -1,3 +1,4 @@
 tensorflow
 librosa>=0.4.3
+natsort
 pydub
