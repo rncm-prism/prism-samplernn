@@ -138,6 +138,7 @@ def create_model(batch_size, config):
         q_type=q_type,
         q_levels=q_levels,
         dim=config.get('dim'),
+        rnn_type=config.get('rnn_type'),
         num_rnn_layers=config.get('num_rnn_layers'),
         emb_size=config.get('emb_size'),
         skip_conn=config.get('skip_conn')

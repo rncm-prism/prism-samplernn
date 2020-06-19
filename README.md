@@ -23,7 +23,7 @@
 ## Features
 
 - Three-tier architecture
-- GRU cell RNN
+- Choice of GRU or LSTM cell RNN
 - Choice of mu-law or linear quantization
 - Seeding of generated audio
 - Sampling temperature control
@@ -135,7 +135,8 @@ Model parameters are specified through a JSON configuration file, which may be p
 | -------------------------|-----------------------|----------------|
 | `seq_len`                | RNN sequence length. Note that the value must be evenly-divisible by the top tier frame size.        | 1024           |
 | `frame_sizes`            | Frame sizes (in samples) of the two upper tiers in the architecture, in ascending order. Note that the frame size of the upper tier must be an even multiple of that of the lower tier.  | [16,64]            |
-| `dim`                    | RNN hidden layer dimensionality          | 1024         | 
+| `dim`                    | RNN hidden layer dimensionality          | 1024         |
+| `rnn_type`               | RNN type to use, either `gru` or `lstm`           | `gru`          | 
 | `num_rnn_layers`         | Depth of the RNN in each of the two upper tiers           | 4          |
 | `q_type`                 | Quantization type (`mu-law` or `linear`)          | `mu-law`          |
 | `q_levels`               | Number of quantization channels (note that if `q_type` is `mu-law` this parameter is ignored, as mu-law quantization requires 256 channels)     | 256           |

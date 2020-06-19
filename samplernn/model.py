@@ -6,7 +6,7 @@ from .frame_rnn import FrameRNN
 class SampleRNN(tf.keras.Model):
 
     def __init__(self, batch_size, frame_sizes, q_levels, q_type,
-                 dim, num_rnn_layers, seq_len, emb_size, skip_conn):
+                 dim, rnn_type, num_rnn_layers, seq_len, emb_size, skip_conn):
         super(SampleRNN, self).__init__()
         self.batch_size = batch_size
         self.big_frame_size = frame_sizes[1]
@@ -14,12 +14,14 @@ class SampleRNN(tf.keras.Model):
         self.q_type = q_type
         self.q_levels = q_levels
         self.dim = dim
+        self.rnn_type = rnn_type
         self.num_rnn_layers = num_rnn_layers
         self.seq_len = seq_len
         self.emb_size = emb_size
         self.skip_conn = skip_conn
 
         self.big_frame_rnn = FrameRNN(
+            rnn_type = self.rnn_type,
             frame_size = self.big_frame_size,
             num_lower_tier_frames = self.big_frame_size // self.frame_size,
             num_layers = self.num_rnn_layers,
@@ -29,6 +31,7 @@ class SampleRNN(tf.keras.Model):
         )
 
         self.frame_rnn = FrameRNN(
+            rnn_type = self.rnn_type,
             frame_size = self.frame_size,
             num_lower_tier_frames = self.frame_size,
             num_layers = self.num_rnn_layers,

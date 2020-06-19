@@ -31,10 +31,10 @@ class Conv1DTranspose(tf.keras.layers.Layer):
         return self._model.compute_output_shape(input_shape)
 
 
-class RNN(tf.keras.layers.Layer):
+class GRU(tf.keras.layers.Layer):
 
     def __init__(self, dim, num_layers=1, skip_conn=False, *args, **kwargs):
-        super(RNN, self).__init__()
+        super(GRU, self).__init__()
         self.dim = dim
         self.num_layers = num_layers
         self.skip_conn = skip_conn
@@ -57,6 +57,38 @@ class RNN(tf.keras.layers.Layer):
         for (i, name) in enumerate(self._layer_names):
             rnn = self.__getattribute__(name)
             (seqs, state) = rnn(seqs, initial_state=state)
+            if self.skip_conn==True and i<self.num_layers-1:
+                seqs = tf.concat((seqs, inputs), axis=2)
+        return seqs
+
+
+class LSTM(tf.keras.layers.Layer):
+
+    def __init__(self, dim, num_layers=1, skip_conn=False, *args, **kwargs):
+        super(LSTM, self).__init__()
+        self.dim = dim
+        self.num_layers = num_layers
+        self.skip_conn = skip_conn
+
+        def layer():
+            return tf.keras.layers.LSTM(
+                self.dim,
+                return_sequences=True,
+                return_state=True,
+                stateful=True,
+                *args, **kwargs)
+
+        self._layer_names = ['layer_' + str(i) for i in range(self.num_layers)]
+        for name in self._layer_names:
+             self.__setattr__(name, layer())
+
+    def call(self, inputs):
+        seqs = inputs
+        state = None
+        for (i, name) in enumerate(self._layer_names):
+            rnn = self.__getattribute__(name)
+            (seqs, state_h, state_c) = rnn(seqs, initial_state=state)
+            state = [state_h, state_c]
             if self.skip_conn==True and i<self.num_layers-1:
                 seqs = tf.concat((seqs, inputs), axis=2)
         return seqs

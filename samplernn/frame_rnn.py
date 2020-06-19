@@ -1,10 +1,10 @@
 import tensorflow as tf
-from .nn import RNN
+from .nn import GRU, LSTM
 
 
 class FrameRNN(tf.keras.layers.Layer):
 
-    def __init__(self, frame_size, num_lower_tier_frames, num_layers, dim, q_levels, skip_conn):
+    def __init__(self, rnn_type, frame_size, num_lower_tier_frames, num_layers, dim, q_levels, skip_conn):
         super(FrameRNN, self).__init__()
         self.frame_size = frame_size
         self.num_lower_tier_frames = num_lower_tier_frames
@@ -13,7 +13,8 @@ class FrameRNN(tf.keras.layers.Layer):
         self.q_levels = q_levels
         self.skip_conn = skip_conn
         self.inputs = tf.keras.layers.Dense(self.dim)
-        self.rnn = RNN(self.dim, self.num_layers, self.skip_conn)
+        self.rnn = LSTM(self.dim, self.num_layers, self.skip_conn) if rnn_type=='lstm' else \
+            GRU(self.dim, self.num_layers, self.skip_conn)
 
     def build(self, input_shape):
         self.upsample = tf.Variable(

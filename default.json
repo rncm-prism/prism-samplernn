@@ -2,6 +2,7 @@
     "seq_len": 1024,
     "frame_sizes": [16,64],
     "dim": 1024,
+    "rnn_type": "gru",
     "num_rnn_layers": 4,
     "q_type": "mu-law",
     "q_levels": 256,
