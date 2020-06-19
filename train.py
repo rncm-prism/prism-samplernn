@@ -122,10 +122,10 @@ optimizer_factory = {'adam': create_adam_optimizer,
 
 
 def create_model(batch_size, config):
-    seq_len = config['seq_len']
-    frame_sizes = config['frame_sizes']
-    q_type = config['q_type']
-    q_levels = 256 if q_type=='mu-law' else config['q_levels']
+    seq_len = config.get('seq_len')
+    frame_sizes = config.get('frame_sizes')
+    q_type = config.get('q_type')
+    q_levels = 256 if q_type=='mu-law' else config.get('q_levels')
     assert frame_sizes[0] < frame_sizes[1], 'Frame sizes should be specified in ascending order'
     # The following model configuration interdependencies are sourced from the original implementation:
     # https://github.com/soroushmehr/sampleRNN_ICLR2017/blob/master/models/three_tier/three_tier.py
@@ -137,9 +137,10 @@ def create_model(batch_size, config):
         seq_len=seq_len,
         q_type=q_type,
         q_levels=q_levels,
-        dim=config['dim'],
-        num_rnn_layers=config['num_rnn_layers'],
-        emb_size=config['emb_size'],
+        dim=config.get('dim'),
+        num_rnn_layers=config.get('num_rnn_layers'),
+        emb_size=config.get('emb_size'),
+        skip_conn=config.get('skip_conn')
     )
 
 

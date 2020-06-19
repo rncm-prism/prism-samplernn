@@ -140,6 +140,7 @@ Model parameters are specified through a JSON configuration file, which may be p
 | `q_type`                 | Quantization type (`mu-law` or `linear`)          | `mu-law`          |
 | `q_levels`               | Number of quantization channels (note that if `q_type` is `mu-law` this parameter is ignored, as mu-law quantization requires 256 channels)     | 256           |
 | `emb_size`               | Size of the embedding layer in the bottom tier (sample-level MLP)         | 256          |
+| `skip_conn`              | Whether to add skip connections to the model's RNN layers        | `False`          |
 
 -----------
 

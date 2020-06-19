@@ -33,10 +33,11 @@ class Conv1DTranspose(tf.keras.layers.Layer):
 
 class RNN(tf.keras.layers.Layer):
 
-    def __init__(self, dim, num_layers=1, *args, **kwargs):
+    def __init__(self, dim, num_layers=1, skip_conn=False, *args, **kwargs):
         super(RNN, self).__init__()
         self.dim = dim
         self.num_layers = num_layers
+        self.skip_conn = skip_conn
 
         def layer():
             return tf.keras.layers.GRU(
@@ -53,7 +54,9 @@ class RNN(tf.keras.layers.Layer):
     def call(self, inputs):
         seqs = inputs
         state = None
-        for name in self._layer_names:
+        for (i, name) in enumerate(self._layer_names):
             rnn = self.__getattribute__(name)
-            (seqs, state) = rnn(seqs, state)
+            (seqs, state) = rnn(seqs, initial_state=state)
+            if self.skip_conn==True and i<self.num_layers-1:
+                seqs = tf.concat((seqs, inputs), axis=2)
         return seqs
