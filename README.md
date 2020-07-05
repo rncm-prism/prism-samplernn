@@ -7,6 +7,8 @@
 
 * [Features](https://github.com/rncm-prism/prism-samplernn#features)
 * [Requirments](https://github.com/rncm-prism/prism-samplernn#requirements)
+   - [Python Packages](https://github.com/rncm-prism/prism-samplernn#python-packages)
+   - [CUDA](https://github.com/rncm-prism/prism-samplernn#cuda)
 * [Installation](https://github.com/rncm-prism/prism-samplernn#installation)
 * [Architecture](https://github.com/rncm-prism/prism-samplernn#architecture)
 * [Training](https://github.com/rncm-prism/prism-samplernn#training)
@@ -32,6 +34,10 @@
 
 ## Requirements
 
+### Python Packages
+
+The following Python packages are required:
+
 - TensorFlow 2
 - Librosa
 - Natsort
@@ -39,10 +45,14 @@
 
 Note that Pydub is only required for the audio chunking script.
 
+### CUDA
+
+Although it is possible to run the training and generation scripts on a CPU alone, optimal (or even tolerable) performance will require a [CUDA-enabled NVIDIA GPU](https://developer.nvidia.com/cuda-gpus). TensorFlow 2 requires CUDA version 10.1, however installation of CUDA is beyond the scope of this document - for full instructions on how to install CUDA for your platform see the [TensorFlow GPU guide](https://www.tensorflow.org/install/gpu).
+
 -----------
 
 ## Installation
-The simplest way to install is with [Anaconda](https://www.anaconda.com/distribution/). After running the installer for your platform, open a new terminal window or tab so that the `conda` package manager is available on your `PATH`. Then create a new environment with:
+To install Prism SampleRNN it is **strongly recommended** to use [Anaconda](https://www.anaconda.com/distribution/), a popular open-source platform for scientific computing, which greatly simplifies package management for machine learning projects. After running the installer for your OS, open a new terminal window or tab so that the `conda` package manager is available on your `PATH`. Then create a new environment with:
 
 `conda create -n prism-samplernn anaconda`
 
@@ -104,12 +114,12 @@ The following table lists the hyper-parameters that may be passed at the command
 
 | Parameter Name             | Description           | Default Value  | Required?   |
 | ---------------------------|-----------------------|----------------| -----------|
-| `id`                     | Id for the training session          | None           | Yes        |
+| `id`                     | Id for the training session          | `default`           | No        |
 | `data_dir`               | Path to the directory containing the training data           | None           | Yes        |
 | `verbose`                | Set training output verbosity. If `False` training step output is overwritten, if `True` (the default) it is written to a new line.           | None           | No        |
 | `logdir_root`            | Location in which to store training log files and checkpoints. All such files are placed in a subdirectory with the id of the training session.           | `./logdir`           | No      |
 | `output_dir`             | Path to the directory for audio generated during training           | `./generated`           | No      |
-| `config_file`            | File containing the configuration parameters for the training model. Note that this file must contain valid JSON, and have the `.json` extension. | `./default.json`         | No        |
+| `config_file`            | File containing the configuration parameters for the training model. Note that this file must contain valid JSON, and should have a name that conforms to the `*.config.json` pattern. | `./default.config.json`         | No        |
 | `num_epochs`             | Number of epochs to run the training | 100           | No        |
 | `batch_size`             | Size of the mini-batch. It is recommended that the batch size divide the length of the training corpus without remainder, otherwise the dataset will be truncated to the nearest multiple of the batch size. | 64         | No        |
 | `optimizer`              | TensorFlow optimizer to use for training (`adam`, `sgd` or `rmsprop`) | `adam`        | No        |
@@ -129,7 +139,7 @@ The following table lists the hyper-parameters that may be passed at the command
 
 ### Configuring the Model
 
-Model parameters are specified through a JSON configuration file, which may be passed to the training script through the `--config_file` parameter (defaults to ./default.json). The following table lists the available model parameters (note that all parameters are optional and have defaults):
+Model parameters are specified through a JSON configuration file, which may be passed to the training script through the `--config_file` parameter. This must have a name which conforms to the `*.config.json` pattern (defaults to `./default.config.json`). Note that any configuration file with a name other the name of the supplied default will be ignored by Git (see the `.gitignore` for details). The following table lists the available model parameters (all parameters are optional and have defaults):
 
 | Parameter Name           | Description           | Default Value  |
 | -------------------------|-----------------------|----------------|
@@ -153,7 +163,7 @@ To generate audio from a trained model use the generate.py script:
 python generate.py \
   --output_path path/to/out.wav \
   --checkpoint_path ./logdir/test/predict/ckpt-100 \
-  --config_file ./default.json \
+  --config_file ./default.config.json \
   --num_seqs 10 \
   --dur 10 \
   --sample_rate 22050 \

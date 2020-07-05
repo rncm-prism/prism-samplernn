@@ -17,7 +17,7 @@ from generate import generate
 # https://github.com/ibab/tensorflow-wavenet/issues/255
 LOGDIR_ROOT = 'logdir' if system()=='Windows' else './logdir'
 OUTDIR = './generated'
-CONFIG_FILE = './default.json'
+CONFIG_FILE = './default.config.json'
 NUM_EPOCHS = 100
 BATCH_SIZE = 64
 LEARNING_RATE = 0.001
@@ -55,8 +55,7 @@ def get_arguments():
     parser = argparse.ArgumentParser(description='PRiSM TensorFlow SampleRNN')
     parser.add_argument('--data_dir',                   type=str,            required=True,
                                                         help='Path to the directory containing the training data')
-    parser.add_argument('--id',                         type=str,            required=True,
-                                                        help='Id for the current training session')
+    parser.add_argument('--id',                         type=str,            default='default', help='Id for the current training session')
     parser.add_argument('--verbose',                    type=check_bool,
                                                         help='Whether to print training step output to a new line each time (the default), or overwrite the last output')
     parser.add_argument('--batch_size',                 type=check_positive, default=BATCH_SIZE, help='Size of the mini-batch')

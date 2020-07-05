@@ -1,5 +1,14 @@
-/logdir/*
-pip-selfcheck.json
-__pycache__
-*.wav
+# System
 **/.DS_Store
+**/Thumbs.db
+
+# Python
+__pycache__
+pip-selfcheck.json
+
+# Project
+/logdir/*
+!/logdir/default/**/.gitkeep
+*.config.json
+!default.config.json
+*.wav
