@@ -143,12 +143,14 @@ def create_inference_model(ckpt_path, num_seqs, config):
     model = SampleRNN(
         batch_size=num_seqs, # Generate sequences in batches
         frame_sizes=config['frame_sizes'],
+        seq_len=config['seq_len'],
         q_type=config['q_type'],
         q_levels=config['q_levels'],
         dim=config['dim'],
+        rnn_type=config.get('rnn_type'),
         num_rnn_layers=config['num_rnn_layers'],
-        seq_len=config['seq_len'],
         emb_size=config['emb_size'],
+        skip_conn=config.get('skip_conn')
     )
     num_samps = config['seq_len'] + model.big_frame_size
     init_data = np.zeros((model.batch_size, num_samps, 1), dtype='int32')
