@@ -240,7 +240,7 @@ def main():
         for epoch in range(epoch_start, args.num_epochs + 1):
             ckpt.epoch.assign(epoch)
             batch = -1
-            for (step, (inputs, reset)) in enumerate(train_iter()):
+            for (step, (inputs, reset)) in enumerate(train_iter(), 1):
                 # Reset RNN states at the end of each batch
                 if reset==True:
                     batch += 1
@@ -267,11 +267,11 @@ def main():
                 if step % args.checkpoint_every == 0:
                     ckpt_manager.save()
 
-                if epoch == 1 and step == 0:
+                if epoch == 1 and step == 1:
                     with writer.as_default():
                         tf.summary.trace_export(
                             name="samplernn_model_trace",
-                            step=0,
+                            step=1,
                             profiler_outdir=logdir_train)
 
             train_accuracy.reset_states()
