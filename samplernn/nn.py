@@ -31,93 +31,56 @@ class Conv1DTranspose(tf.keras.layers.Layer):
         return self._model.compute_output_shape(input_shape)
 
 
-class GRU(tf.keras.layers.Layer):
+def rnn_factory(type, *args, **kwargs):
+    rnn = getattr(tf.keras.layers, type)
+    return rnn(*args, **kwargs)
 
-    def __init__(self, dim, num_layers=1, skip_conn=False, *args, **kwargs):
-        assert not(num_layers==1 and skip_conn==True), \
-            "Only RNNs with more than a single layer can have skip connections."
-        super(GRU, self).__init__()
+class RNN(tf.keras.layers.Layer):
+
+    def __init__(self, type, dim, num_layers=1, skip_conn=False, *args, **kwargs):
+        self.type = type.upper()
         self.dim = dim
         self.num_layers = num_layers
         self.skip_conn = skip_conn
+        self._args, self._kwargs = args, kwargs
+        super(RNN, self).__init__()
 
-        def layer():
-            return tf.keras.layers.GRU(
-                self.dim,
-                return_sequences=True,
-                return_state=True,
-                stateful=True,
-                *args, **kwargs)
-
+    def build(self, input_shape):
         self._layer_names = ['layer_' + str(i) for i in range(self.num_layers)]
         for name in self._layer_names:
-             self.__setattr__(name, layer())
-
+            self.__setattr__(name, rnn_factory(
+            self.type,
+            units=self.dim,
+            return_sequences=True,
+            return_state=True,
+            stateful=True,
+            *self._args, **self._kwargs))
         if self.skip_conn==True:
-            self.out_bias = tf.keras.layers.Dense(
-                self.dim, kernel_initializer='he_uniform')
-            self.out_no_bias = tf.keras.layers.Dense(
-                self.dim, kernel_initializer='he_uniform', use_bias=False)
+            for (i, name) in enumerate(self._layer_names):
+                self.__setattr__(name + '_skip_out', tf.keras.layers.Dense(
+                    self.dim, kernel_initializer='he_uniform', use_bias=(i==0)))
+        super(RNN, self).build(input_shape)
+
+    def run_rnn(self, rnn_name, inputs, state):
+        rnn = self.__getattribute__(rnn_name)
+        if self.type == 'GRU':
+            return rnn(inputs, initial_state=state)
+        elif self.type == "LSTM":
+            (seqs, state_h, state_c) = rnn(inputs, initial_state=state)
+            return (seqs, (state_h, state_c))
 
     def call(self, inputs):
         seqs = inputs
         state = None
         if not self.skip_conn:
             for name in self._layer_names:
-                rnn = self.__getattribute__(name)
-                (seqs, state) = rnn(seqs, initial_state=state)
+                (seqs, state) = self.run_rnn(name, seqs, state)
             return seqs
         else:
             out = tf.zeros(self.dim)
             for (i, name) in enumerate(self._layer_names):
-                rnn = self.__getattribute__(name)
                 seqs = seqs if i==0 else tf.concat((seqs, inputs), axis=2)
-                (seqs, state) = rnn(seqs, initial_state=state)
-                out += self.out_bias(seqs) if i==0 else self.out_no_bias(seqs)
-            return out
-
-
-class LSTM(tf.keras.layers.Layer):
-
-    def __init__(self, dim, num_layers=1, skip_conn=False, *args, **kwargs):
-        super(LSTM, self).__init__()
-        self.dim = dim
-        self.num_layers = num_layers
-        self.skip_conn = skip_conn
-
-        def layer():
-            return tf.keras.layers.LSTM(
-                self.dim,
-                return_sequences=True,
-                return_state=True,
-                stateful=True,
-                *args, **kwargs)
-
-        self._layer_names = ['layer_' + str(i) for i in range(self.num_layers)]
-        for name in self._layer_names:
-             self.__setattr__(name, layer())
-
-        if self.skip_conn==True:
-            self.out_bias = tf.keras.layers.Dense(
-                self.dim, kernel_initializer='he_uniform')
-            self.out_no_bias = tf.keras.layers.Dense(
-                self.dim, kernel_initializer='he_uniform', use_bias=False)
-
-    def call(self, inputs):
-        seqs = inputs
-        state = None
-        if not self.skip_conn:
-            for name in self._layer_names:
-                rnn = self.__getattribute__(name)
-                (seqs, state_h, state_c) = rnn(seqs, initial_state=state)
-                state = [state_h, state_c]
-            return seqs
-        else:
-            out = tf.zeros(self.dim)
-            for (i, name) in enumerate(self._layer_names):
-                rnn = self.__getattribute__(name)
-                seqs = seqs if i==0 else tf.concat((seqs, inputs), axis=2)
-                (seqs, state_h, state_c) = rnn(seqs, initial_state=state)
-                state = [state_h, state_c]
-                out += self.out_bias(seqs) if i==0 else self.out_no_bias(seqs)
+                (seqs, state) = self.run_rnn(name, seqs, state)
+                dense = self.__getattribute__(name + '_skip_out')
+                out += dense(seqs)
             return out

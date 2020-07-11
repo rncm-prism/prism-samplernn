@@ -190,7 +190,7 @@ def main():
     def get_steps_per_epoch():
         files = find_files(args.data_dir)
         num_batches = len(files) // args.batch_size
-        (samples, _) = librosa.load(files[0], sr=None, mono=False)
+        (samples, _) = librosa.load(files[0], sr=None, mono=True)
         steps_per_batch = int(np.floor(len(samples) / float(model.seq_len)))
         return num_batches * steps_per_batch
 
