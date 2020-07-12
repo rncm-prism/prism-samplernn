@@ -49,12 +49,12 @@ class RNN(tf.keras.layers.Layer):
         self._layer_names = ['layer_' + str(i) for i in range(self.num_layers)]
         for name in self._layer_names:
             self.__setattr__(name, rnn_factory(
-            self.type,
-            units=self.dim,
-            return_sequences=True,
-            return_state=True,
-            stateful=True,
-            *self._args, **self._kwargs))
+                self.type,
+                units=self.dim,
+                return_sequences=True,
+                return_state=True,
+                stateful=True,
+                *self._args, **self._kwargs))
         if self.skip_conn==True:
             for (i, name) in enumerate(self._layer_names):
                 self.__setattr__(name + '_skip_out', tf.keras.layers.Dense(
@@ -65,7 +65,7 @@ class RNN(tf.keras.layers.Layer):
         rnn = self.__getattribute__(rnn_name)
         if self.type == 'GRU':
             return rnn(inputs, initial_state=state)
-        elif self.type == "LSTM":
+        elif self.type == 'LSTM':
             (seqs, state_h, state_c) = rnn(inputs, initial_state=state)
             return (seqs, (state_h, state_c))
 
