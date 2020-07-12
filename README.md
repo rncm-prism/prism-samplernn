@@ -139,7 +139,7 @@ The following table lists the hyper-parameters that may be passed at the command
 
 ### Configuring the Model
 
-Model parameters are specified through a JSON configuration file, which may be passed to the training script through the `--config_file` parameter. This must have a name which conforms to the `*.config.json` pattern (defaults to `./default.config.json`). Note that any configuration file with a name other the name of the supplied default will be ignored by Git (see the `.gitignore` for details). The following table lists the available model parameters (all parameters are optional and have defaults):
+Model parameters are specified through a JSON configuration file, which may be passed to the training script through the `--config_file` parameter. This must have a name which conforms to the `*.config.json` pattern (defaults to `default.config.json`). Note that any configuration file with a name other the name of the supplied default will be ignored by Git (see the `.gitignore` for details). The following table lists the available model parameters (all parameters are optional and have defaults):
 
 | Parameter Name           | Description           | Default Value  |
 | -------------------------|-----------------------|----------------|
@@ -162,7 +162,7 @@ To generate audio from a trained model use the generate.py script:
 ```shell
 python generate.py \
   --output_path path/to/out.wav \
-  --checkpoint_path ./logdir/test/predict/ckpt-100 \
+  --checkpoint_path ./logdir/default/predict/model.ckpt-100 \
   --config_file ./default.config.json \
   --num_seqs 10 \
   --dur 10 \

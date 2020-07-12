@@ -283,7 +283,7 @@ def main():
 
             # Save model weights for inference model
             print('Saving checkpoint for epoch {}...'.format(epoch))
-            epoch_ckpt_path = '{}/ckpt-{}'.format(logdir_predict, epoch)
+            epoch_ckpt_path = '{}/model.ckpt-{}'.format(logdir_predict, epoch)
             model.save_weights(epoch_ckpt_path)
 
             # Generate samples
