@@ -231,7 +231,7 @@ def main():
     epoch_start = ckpt.epoch.numpy()
     # Track previous epoch so non-verbose output can
     # be written to a new line when changing epoch
-    prev_epoch = 0
+    prev_epoch = epoch_start - 1
 
     steps_per_epoch = get_steps_per_epoch()
 
@@ -290,7 +290,7 @@ def main():
             print('Generating samples for epoch {}...'.format(epoch))
             output_file_path = '{}/{}_epoch_{}.wav'.format(generate_dir, args.id, epoch)
             generate(output_file_path, epoch_ckpt_path, config, args.max_generate_per_epoch, args.output_file_dur,
-                    args.sample_rate, args.temperature, args.seed, args.seed_offset)
+                     args.sample_rate, args.temperature, args.seed, args.seed_offset)
 
     except KeyboardInterrupt:
         print()
