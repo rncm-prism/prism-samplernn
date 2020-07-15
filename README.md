@@ -52,7 +52,10 @@ Although it is possible to run the training and generation scripts on a CPU alon
 -----------
 
 ## Installation
-To install Prism SampleRNN it is **strongly recommended** to use [Anaconda](https://www.anaconda.com/distribution/), a popular open-source platform for scientific computing, which greatly simplifies package management for machine learning projects. After running the installer for your OS, open a new terminal window or tab so that the `conda` package manager is available on your `PATH`. Then create a new environment with:
+
+If you would prefer to experiment with PRiSM SampleRNN without installing locally we have set up a [Google Colab notebook](https://colab.research.google.com/gist/relativeflux/10573e9e1b10b1ff45e3a00099259741/prism-samplernn.ipynb). Colab is a cloud-based environment for machine learning that provides free access to GPUs. It is an excellent way for those new to machine learning to gain experience with the kinds of tasks and environments involved, with minimal ceremony. Please note that you will need a Google account, and be signed into it, to use the notebook.
+
+To install Prism SampleRNN on a *local* machine it is **strongly recommended** to use [Anaconda](https://www.anaconda.com/distribution/), a popular open-source platform for scientific computing, which greatly simplifies package management for machine learning projects. After running the installer for your OS, open a new terminal window or tab so that the `conda` package manager is available on your `PATH`. Then create a new environment with:
 
 `conda create -n prism-samplernn anaconda`
 
