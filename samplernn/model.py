@@ -44,6 +44,22 @@ class SampleRNN(tf.keras.Model):
             self.frame_size, self.dim, self.q_levels, self.emb_size
         )
 
+    def train_step(self, data):
+        (x, y) = data
+        with tf.GradientTape() as tape:
+            raw_output = self(x, training=True)
+            prediction = tf.reshape(raw_output, [-1, self.q_levels])
+            target = tf.reshape(y, [-1])
+            loss = self.compiled_loss(
+                target,
+                prediction,
+                regularization_losses=self.losses)
+        grads = tape.gradient(loss, self.trainable_variables)
+        grads, _ = tf.clip_by_global_norm(grads, 5.0)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+        self.compiled_metrics.update_state(target, prediction)
+        return {metric.name: metric.result() for metric in self.metrics}
+
     def call(self, inputs):
         # UPPER TIER
         big_frame_outputs = self.big_frame_rnn(
