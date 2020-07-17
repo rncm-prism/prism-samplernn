@@ -4,8 +4,17 @@ import os
 import time
 import json
 from platform import system
+import logging
+
+# Disable verbose TensorFlow looging...
+# See https://github.com/LucaCappelletti94/silence_tensorflow
+os.environ["KMP_AFFINITY"] = "noverbose"
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
+tf.autograph.set_verbosity(3)
+
 import numpy as np
 import librosa
 
@@ -145,9 +154,10 @@ def create_model(batch_size, config):
 def main():
     args = get_arguments()
 
-    # Create training session directories
     if not find_files(args.data_dir):
         raise ValueError("No audio files found in '{}'.".format(args.data_dir))
+
+    # Create training session directories
     logdir = os.path.join(args.logdir_root, args.id)
     if not os.path.exists(logdir):
         os.makedirs(logdir)
@@ -177,11 +187,11 @@ def main():
     )
 
     compute_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-    train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='train_accuracy')
+    train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='accuracy')
     model.compile(optimizer=opt, loss=compute_loss, metrics=[train_accuracy])
 
     overlap = model.big_frame_size
-    dataset = get_dataset(args.data_dir, args.batch_size, model.seq_len, overlap)
+    dataset = get_dataset(args.data_dir, args.batch_size, seq_len, overlap)
 
     # Dataset iterator
     def train_iter():
@@ -198,8 +208,6 @@ def main():
         (samples, _) = librosa.load(files[0], sr=None, mono=True)
         steps_per_batch = int(np.floor(len(samples) / float(model.seq_len)))
         return num_batches * steps_per_batch
-
-    training_start_time = time.time()
 
     steps_per_epoch = get_steps_per_epoch()
 
