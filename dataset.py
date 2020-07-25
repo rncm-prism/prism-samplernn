@@ -8,14 +8,15 @@ def pad_batch(batch, batch_size, seq_len, overlap):
     zeros = np.zeros([batch_size, overlap, 1], dtype='float32')
     return tf.concat([zeros, batch[:, :num_samps, :]], axis=1)
 
-def get_dataset(data_dir, batch_size, seq_len, overlap):
+def get_dataset(data_dir, num_epochs, batch_size, seq_len, overlap):
     dataset = tf.data.Dataset.from_generator(
         lambda: load_audio(data_dir, batch_size),
         output_types=tf.float32,
         output_shapes=((None, 1)),
     )
-    dataset = dataset.batch(batch_size)
+    dataset = dataset.repeat(num_epochs).batch(batch_size)
     dataset = dataset.map(lambda batch: tf.py_function(
         func=pad_batch, inp=[batch, batch_size, seq_len, overlap], Tout=tf.float32
     ))
+    #return dataset.repeat(num_epochs)
     return dataset

@@ -52,7 +52,6 @@ class RNN(tf.keras.layers.Layer):
                 self.type,
                 units=self.dim,
                 return_sequences=True,
-                return_state=True,
                 stateful=True,
                 *self._args, **self._kwargs))
         if self.skip_conn==True:
@@ -61,26 +60,23 @@ class RNN(tf.keras.layers.Layer):
                     self.dim, kernel_initializer='he_uniform', use_bias=(i==0)))
         super(RNN, self).build(input_shape)
 
-    def run_rnn(self, rnn_name, inputs, state):
-        rnn = self.__getattribute__(rnn_name)
-        if self.type == 'GRU':
-            return rnn(inputs, initial_state=state)
-        elif self.type == 'LSTM':
-            (seqs, state_h, state_c) = rnn(inputs, initial_state=state)
-            return (seqs, (state_h, state_c))
+    def run_rnn(self, name, inputs):
+        rnn = self.__getattribute__(name)
+        return rnn(inputs)
+
+    def run_dense(self, name, inputs):
+        dense = self.__getattribute__(name + '_skip_out')
+        return dense(inputs)
 
     def call(self, inputs):
         seqs = inputs
-        state = None
         if not self.skip_conn:
             for name in self._layer_names:
-                (seqs, state) = self.run_rnn(name, seqs, state)
+                seqs = self.run_rnn(name, seqs)
             return seqs
         else:
             out = tf.zeros(self.dim)
             for (i, name) in enumerate(self._layer_names):
-                seqs = seqs if i==0 else tf.concat((seqs, inputs), axis=2)
-                (seqs, state) = self.run_rnn(name, seqs, state)
-                dense = self.__getattribute__(name + '_skip_out')
-                out += dense(seqs)
+                seqs = self.run_rnn(name, (seqs if i>0 else tf.concat((seqs, inputs), axis=2)))
+                out += self.run_dense(name, seqs)
             return out

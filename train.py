@@ -154,8 +154,10 @@ def create_model(batch_size, config):
 def main():
     args = get_arguments()
 
-    if not find_files(args.data_dir):
+    files = find_files(args.data_dir)
+    if not files:
         raise ValueError("No audio files found in '{}'.".format(args.data_dir))
+    dataset_size = len(files)
 
     # Create training session directories
     logdir = os.path.join(args.logdir_root, args.id)
@@ -177,6 +179,7 @@ def main():
     model = create_model(args.batch_size, config)
 
     seq_len = model.seq_len
+    overlap = model.big_frame_size
     q_type = model.q_type
     q_levels = model.q_levels
 
@@ -190,8 +193,17 @@ def main():
     train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='accuracy')
     model.compile(optimizer=opt, loss=compute_loss, metrics=[train_accuracy])
 
-    overlap = model.big_frame_size
-    dataset = get_dataset(args.data_dir, args.batch_size, seq_len, overlap)
+
+    def get_initial_epoch():
+        latest_checkpoint = tf.train.latest_checkpoint(logdir_train)
+        if latest_checkpoint:
+            epoch = int(latest_checkpoint.split('/')[-1].split('-')[-1])
+        else:
+            epoch = 0
+        return epoch
+
+    initial_epoch = get_initial_epoch()
+    dataset = get_dataset(args.data_dir, args.num_epochs - initial_epoch, args.batch_size, seq_len, overlap)
 
     # Dataset iterator
     def train_iter():
@@ -202,39 +214,61 @@ def main():
                 y = x[:, overlap : overlap+seq_len]
                 yield (x, y)
 
-    def get_steps_per_epoch():
-        files = find_files(args.data_dir)
-        num_batches = len(files) // args.batch_size
+    def get_steps_per_batch():
         (samples, _) = librosa.load(files[0], sr=None, mono=True)
-        steps_per_batch = int(np.floor(len(samples) / float(model.seq_len)))
+        return int(np.floor(len(samples) / float(seq_len)))
+
+    def get_steps_per_epoch():
+        num_batches = dataset_size // args.batch_size
+        steps_per_batch = get_steps_per_batch()
         return num_batches * steps_per_batch
 
     steps_per_epoch = get_steps_per_epoch()
 
-    init_data = np.random.randint(0, model.q_levels, (model.batch_size, overlap + model.seq_len, 1))
-    model(init_data)
-    model.reset_states()
+    class TrainingStepCallback(tf.keras.callbacks.Callback):
+        def __init__(self):
+            self.steps_per_epoch = get_steps_per_epoch()
+            self.steps_per_batch = get_steps_per_batch()
+            self.step_start_time = 0
+
+        def on_train_begin(self, logs):
+            latest_checkpoint = tf.train.latest_checkpoint(logdir_train)
+            if args.resume==True and latest_checkpoint:
+                model.load_weights(latest_checkpoint)
+
+        def on_epoch_begin(self, epoch, logs):
+            self.epoch = epoch + 1
+
+        def on_batch_begin(self, batch, logs):
+            if (batch + 1) % self.steps_per_batch == 1 : model.reset_states()
+            self.step_start_time = time.time()
+
+        def on_batch_end(self, batch, logs):
+            if args.verbose==True:
+                loss, acc = logs.get('loss'), logs.get('accuracy')
+                step_duration = time.time() - self.step_start_time
+                template = 'Epoch: {:d}/{:d}, Step: {:d}/{:d}, Loss: {:.4f}, Accuracy: {:.4f}, ({:.4f} sec/step)'
+                print(template.format(
+                    self.epoch, args.num_epochs, batch + 1, self.steps_per_epoch, loss, acc * 100, step_duration))
 
     callbacks = [
         tf.keras.callbacks.ModelCheckpoint(
-            filepath='{0}/ckpt_{{epoch}}'.format(logdir_train),
-            save_freq=args.checkpoint_every),
-        tf.keras.callbacks.ModelCheckpoint(
-            filepath='{0}/model.ckpt_{{epoch}}'.format(logdir_predict),
-            save_weights_only=True,
-            save_best_only=True),
+            filepath='{0}/model.ckpt-{{epoch}}'.format(logdir_train),
+            save_weights_only=True),
+        TrainingStepCallback(),
         tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3),
-        tf.keras.callbacks.TensorBoard(
-            log_dir=logdir,
-            update_freq=50)
+        tf.keras.callbacks.TensorBoard(log_dir=logdir, update_freq=50)
     ]
 
     # Train
-    verbose = 1 if args.verbose==True else 2
+    init_data = np.random.randint(0, model.q_levels, (model.batch_size, overlap + model.seq_len, 1))
+    model(init_data)
+    verbose = 0 if args.verbose==True else 1
     try:
         model.fit(
             train_iter(),
             epochs=args.num_epochs,
+            initial_epoch=initial_epoch,
             steps_per_epoch=steps_per_epoch,
             shuffle=False,
             callbacks=callbacks,

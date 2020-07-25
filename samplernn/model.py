@@ -44,6 +44,7 @@ class SampleRNN(tf.keras.Model):
             self.frame_size, self.dim, self.q_levels, self.emb_size
         )
 
+    @tf.function
     def train_step(self, data):
         (x, y) = data
         with tf.GradientTape() as tape:
