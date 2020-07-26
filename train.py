@@ -193,7 +193,6 @@ def main():
     train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='accuracy')
     model.compile(optimizer=opt, loss=compute_loss, metrics=[train_accuracy])
 
-
     def get_initial_epoch():
         latest_checkpoint = tf.train.latest_checkpoint(logdir_train)
         if latest_checkpoint:
@@ -244,12 +243,11 @@ def main():
             self.step_start_time = time.time()
 
         def on_batch_end(self, batch, logs):
-            if args.verbose==True:
-                loss, acc = logs.get('loss'), logs.get('accuracy')
-                step_duration = time.time() - self.step_start_time
-                template = 'Epoch: {:d}/{:d}, Step: {:d}/{:d}, Loss: {:.4f}, Accuracy: {:.4f}, ({:.4f} sec/step)'
-                print(template.format(
-                    self.epoch, args.num_epochs, batch + 1, self.steps_per_epoch, loss, acc * 100, step_duration))
+            loss, acc = logs.get('loss'), logs.get('accuracy')
+            step_duration = time.time() - self.step_start_time
+            template = 'Epoch: {:d}/{:d}, Step: {:d}/{:d}, Loss: {:.3f}, Accuracy: {:.3f}, ({:.3f} sec/step)'
+            end_char = '\r' if (args.verbose == False) and (batch + 1 != self.steps_per_epoch) else '\n'
+            print(template.format(self.epoch, args.num_epochs, batch + 1, self.steps_per_epoch, loss, acc, step_duration), end=end_char)
 
     callbacks = [
         tf.keras.callbacks.ModelCheckpoint(
@@ -263,7 +261,6 @@ def main():
     # Train
     init_data = np.random.randint(0, model.q_levels, (model.batch_size, overlap + model.seq_len, 1))
     model(init_data)
-    verbose = 0 if args.verbose==True else 1
     try:
         model.fit(
             train_iter(),
@@ -272,7 +269,7 @@ def main():
             steps_per_epoch=steps_per_epoch,
             shuffle=False,
             callbacks=callbacks,
-            verbose=verbose,
+            verbose=0,
         )
     except KeyboardInterrupt:
         print()
