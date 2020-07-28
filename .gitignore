@@ -8,7 +8,7 @@ pip-selfcheck.json
 
 # Project
 /logdir/*
-!/logdir/**/.gitkeep
+!/logdir/default/.gitkeep
 *.config.json
 !default.config.json
 *.wav

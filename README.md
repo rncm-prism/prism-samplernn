@@ -95,13 +95,12 @@ python train.py \
   --data_dir ./data \
   --num_epochs 100 \
   --batch_size 128 \
-  --max_checkpoints 2 \
-  --checkpoint_every 200 \
+  --checkpoint_every 5 \
   --output_file_dur 3 \
   --sample_rate 16000
 ```
 
-Temporary checkpoints storing the current state of the model are periodically saved to disk during each epoch, with a permanent checkpoint saved at the end of each epoch. An audio file is also generated at the end of an epoch, which may be used to assess the progress of the training.
+Checkpoints storing the current state of the model are periodically saved to disk during training, with the default behaviour being to save a checkpoint at the end of each epoch. This interval may be modified through the `--checkpoint_every` parameter.  By default every checkpoint will be saved, but this behaviour can be controlled using the `--checkpoint_policy` parameter. Pass `Best` to save only the latest best checkpoint according to the training metrics (loss and accuracy). An audio file is also generated at the end of an epoch, which may be used to assess the progress of the training.
 
 ### Statistics
 
@@ -128,8 +127,8 @@ The following table lists the hyper-parameters that may be passed at the command
 | `optimizer`              | TensorFlow optimizer to use for training (`adam`, `sgd` or `rmsprop`) | `adam`        | No        |
 | `learning_rate`          | Learning rate of the training optimizer   | 0.001         | No        |
 | `momentum`               | Momentum of the training optimizer (applies to `sgd` and `rmsprop` only)   | 0.9      | No        |
-| `checkpoint_every`       | Interval (in steps) at which to generate a checkpoint file   | 100      | No        |
-| `max_checkpoints`        | Maximum number of training checkpoints to keep   | 5      | No        |
+| `checkpoint_every`       | Interval (in epochs) at which to generate a checkpoint file. Defaults to 1, for every epoch.   | 1      | No        |
+| `checkpoint_policy`      | Policy for saving checkpoints - 'All' to save every checkpoint, or 'Best' to save the latest best checkpoint   | 'All'      | No        |
 | `resume`                 | Whether to resume training from the last available checkpoint   | `True`      | No        |
 | `max_generate_per_epoch` | Maximum number of output files to generate at the end of each epoch   | 1      | No        |
 | `sample_rate`            | Sample rate of the generated audio | 22050         | No        |
@@ -165,7 +164,7 @@ To generate audio from a trained model use the generate.py script:
 ```shell
 python generate.py \
   --output_path path/to/out.wav \
-  --checkpoint_path ./logdir/default/predict/model.ckpt-100 \
+  --checkpoint_path ./logdir/default/26.07.2020_20.48.51/model.ckpt-100 \
   --config_file ./default.config.json \
   --num_seqs 10 \
   --dur 10 \

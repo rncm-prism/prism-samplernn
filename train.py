@@ -2,6 +2,7 @@ from __future__ import print_function
 import argparse
 import os
 import time
+from datetime import datetime
 import json
 from platform import system
 import logging
@@ -34,7 +35,7 @@ MOMENTUM = 0.9
 SILENCE_THRESHOLD = None
 OUTPUT_DUR = 3 # Duration of generated audio in seconds
 CHECKPOINT_EVERY = 200
-MAX_CHECKPOINTS = 5
+CHECKPOINT_POLICY = 'All' # 'All' or 'Best'
 SAMPLE_RATE = 22050 # Sample rate of generated audio
 SAMPLING_TEMPERATURE = 0.75
 SEED_OFFSET = 0
@@ -81,16 +82,18 @@ def get_arguments():
     parser.add_argument('--num_epochs',                 type=check_positive, default=NUM_EPOCHS,
                                                         help='Number of training epochs')
     parser.add_argument('--checkpoint_every',           type=check_positive, default=CHECKPOINT_EVERY,
-                                                        help='Interval (in steps) at which to generate a checkpoint file')
+                                                        help='Interval (in epochs) at which to generate a checkpoint file')
     parser.add_argument('--optimizer',                  type=str,            default='adam', choices=optimizer_factory.keys(),
                                                         help='Type of training optimizer to use')
     parser.add_argument('--learning_rate',              type=float,          default=LEARNING_RATE,
                                                         help='Learning rate of training')
+    parser.add_argument('--reduce_learning_rate_after', type=int,            default=0,
+                                                        help='Exponentially reduce learning rate after this many epochs')
     parser.add_argument('--momentum',                   type=float,          default=MOMENTUM,
                                                         help='Optimizer momentum')
     #parser.add_argument('--silence_threshold',          type=float,          default=SILENCE_THRESHOLD)
-    parser.add_argument('--max_checkpoints',            type=check_positive, default=MAX_CHECKPOINTS,
-                                                        help='Maximum number of training checkpoints to keep')
+    parser.add_argument('--checkpoint_policy',          type=str, default=CHECKPOINT_POLICY, choices=['All', 'Best'],
+                                                        help='Policy for saving checkpoints')
     parser.add_argument('--resume',                     type=check_bool,     default=RESUME,
                                                         help='Whether to resume training from the last available checkpoint')
     parser.add_argument('--max_generate_per_epoch',     type=check_positive, default=MAX_GENERATE_PER_EPOCH,
@@ -150,6 +153,16 @@ def create_model(batch_size, config):
         skip_conn=config.get('skip_conn')
     )
 
+def get_latest_checkpoint(logdir):
+    rundirs = os.listdir(logdir)
+    if len(rundirs) > 0:
+        rundir_datetimes = []
+        for f in rundirs:
+            if os.path.isdir(os.path.join(logdir, f)):
+                dt = datetime.strptime(f, '%d.%m.%Y_%H.%M.%S')
+                rundir_datetimes.append(dt)
+        latest_rundir = max(rundir_datetimes).strftime('%d.%m.%Y_%H.%M.%S')
+        return tf.train.latest_checkpoint(os.path.join(logdir, latest_rundir))
 
 def main():
     args = get_arguments()
@@ -163,15 +176,10 @@ def main():
     logdir = os.path.join(args.logdir_root, args.id)
     if not os.path.exists(logdir):
         os.makedirs(logdir)
-    logdir_train = os.path.join(logdir, 'train')
-    if not os.path.exists(logdir_train):
-        os.makedirs(logdir_train)
-    logdir_predict = os.path.join(logdir, 'predict')
-    if not os.path.exists(logdir_predict):
-        os.makedirs(logdir_predict)
     generate_dir = os.path.join(args.output_dir, args.id)
     if not os.path.exists(generate_dir):
         os.makedirs(generate_dir)
+    rundir = '{}/{}'.format(logdir, datetime.now().strftime('%d.%m.%Y_%H.%M.%S'))
 
     # Load model configuration
     with open(args.config_file, 'r') as config_file:
@@ -194,7 +202,7 @@ def main():
     model.compile(optimizer=opt, loss=compute_loss, metrics=[train_accuracy])
 
     def get_initial_epoch():
-        latest_checkpoint = tf.train.latest_checkpoint(logdir_train)
+        latest_checkpoint = get_latest_checkpoint(logdir)
         if latest_checkpoint:
             epoch = int(latest_checkpoint.split('/')[-1].split('-')[-1])
         else:
@@ -231,7 +239,7 @@ def main():
             self.step_start_time = 0
 
         def on_train_begin(self, logs):
-            latest_checkpoint = tf.train.latest_checkpoint(logdir_train)
+            latest_checkpoint = get_latest_checkpoint(logdir)
             if args.resume==True and latest_checkpoint:
                 model.load_weights(latest_checkpoint)
 
@@ -247,16 +255,36 @@ def main():
             step_duration = time.time() - self.step_start_time
             template = 'Epoch: {:d}/{:d}, Step: {:d}/{:d}, Loss: {:.3f}, Accuracy: {:.3f}, ({:.3f} sec/step)'
             end_char = '\r' if (args.verbose == False) and (batch + 1 != self.steps_per_epoch) else '\n'
-            print(template.format(self.epoch, args.num_epochs, batch + 1, self.steps_per_epoch, loss, acc, step_duration), end=end_char)
+            stats_string = template.format(self.epoch, args.num_epochs, batch + 1, self.steps_per_epoch, loss, acc * 100, step_duration)
+            print(stats_string, end=end_char)
+
+
+    checkpoint_path = '{0}/model.ckpt'.format(rundir) \
+        if args.checkpoint_policy=='Best' \
+        else '{0}/model.ckpt-{{epoch}}'.format(rundir)
 
     callbacks = [
         tf.keras.callbacks.ModelCheckpoint(
-            filepath='{0}/model.ckpt-{{epoch}}'.format(logdir_train),
-            save_weights_only=True),
+            filepath=checkpoint_path,
+            save_weights_only=True,
+            save_best_only=args.checkpoint_policy=='Best',
+            save_freq=args.checkpoint_every * get_steps_per_epoch()),
         TrainingStepCallback(),
         tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3),
-        tf.keras.callbacks.TensorBoard(log_dir=logdir, update_freq=50)
+        tf.keras.callbacks.TensorBoard(log_dir=rundir, update_freq=50)
     ]
+
+    reduce_lr_after = args.reduce_learning_rate_after
+
+    if reduce_lr_after is not None and reduce_lr_after > 0:
+        def scheduler(epoch, leaning_rate):
+            if epoch < reduce_lr_after:
+                return leaning_rate
+            else:
+                return leaning_rate * tf.math.exp(-0.1)
+        callbacks.append(
+            tf.keras.callbacks.LearningRateScheduler(scheduler)
+        )
 
     # Train
     init_data = np.random.randint(0, model.q_levels, (model.batch_size, overlap + model.seq_len, 1))
