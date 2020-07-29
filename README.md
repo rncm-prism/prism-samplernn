@@ -128,7 +128,7 @@ The following table lists the hyper-parameters that may be passed at the command
 | `learning_rate`          | Learning rate of the training optimizer   | 0.001         | No        |
 | `momentum`               | Momentum of the training optimizer (applies to `sgd` and `rmsprop` only)   | 0.9      | No        |
 | `checkpoint_every`       | Interval (in epochs) at which to generate a checkpoint file. Defaults to 1, for every epoch.   | 1      | No        |
-| `checkpoint_policy`      | Policy for saving checkpoints - 'All' to save every checkpoint, or 'Best' to save the latest best checkpoint   | 'All'      | No        |
+| `checkpoint_policy`      | Policy for saving checkpoints - `All` to save every checkpoint, or `Best` to save the latest best checkpoint   | `All`      | No        |
 | `resume`                 | Whether to resume training from the last available checkpoint   | `True`      | No        |
 | `max_generate_per_epoch` | Maximum number of output files to generate at the end of each epoch   | 1      | No        |
 | `sample_rate`            | Sample rate of the generated audio | 22050         | No        |
