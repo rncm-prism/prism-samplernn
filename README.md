@@ -126,6 +126,7 @@ The following table lists the hyper-parameters that may be passed at the command
 | `batch_size`             | Size of the mini-batch. It is recommended that the batch size divide the length of the training corpus without remainder, otherwise the dataset will be truncated to the nearest multiple of the batch size. | 64         | No        |
 | `optimizer`              | TensorFlow optimizer to use for training (`adam`, `sgd` or `rmsprop`) | `adam`        | No        |
 | `learning_rate`          | Learning rate of the training optimizer   | 0.001         | No        |
+| `reduce_learning_rate_after`          | Exponentially reduce learning rate after this many epochs   | None         | No        |
 | `momentum`               | Momentum of the training optimizer (applies to `sgd` and `rmsprop` only)   | 0.9      | No        |
 | `checkpoint_every`       | Interval (in epochs) at which to generate a checkpoint file. Defaults to 1, for every epoch.   | 1      | No        |
 | `checkpoint_policy`      | Policy for saving checkpoints - `All` to save every checkpoint, or `Best` to save the latest best checkpoint   | `All`      | No        |

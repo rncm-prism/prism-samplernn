@@ -87,7 +87,7 @@ def get_arguments():
                                                         help='Type of training optimizer to use')
     parser.add_argument('--learning_rate',              type=float,          default=LEARNING_RATE,
                                                         help='Learning rate of training')
-    parser.add_argument('--reduce_learning_rate_after', type=int,            default=0,
+    parser.add_argument('--reduce_learning_rate_after', type=int,
                                                         help='Exponentially reduce learning rate after this many epochs')
     parser.add_argument('--momentum',                   type=float,          default=MOMENTUM,
                                                         help='Optimizer momentum')
