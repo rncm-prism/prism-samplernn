@@ -131,6 +131,7 @@ The following table lists the hyper-parameters that may be passed at the command
 | `checkpoint_every`       | Interval (in epochs) at which to generate a checkpoint file. Defaults to 1, for every epoch.   | 1      | No        |
 | `checkpoint_policy`      | Policy for saving checkpoints - `All` to save every checkpoint, or `Best` to save the latest best checkpoint   | `All`      | No        |
 | `resume`                 | Whether to resume training from the last available checkpoint   | `True`      | No        |
+| `generate`         | Whether to generate audio output during training. Generation is aligned with checkpoints, meaning that audio is only generated after a new checkpoint has been created.   | `True`      | No        |
 | `max_generate_per_epoch` | Maximum number of output files to generate at the end of each epoch   | 1      | No        |
 | `sample_rate`            | Sample rate of the generated audio | 22050         | No        |
 | `output_file_dur`        | Duration of generated audio files (in seconds) | 3         | No        |

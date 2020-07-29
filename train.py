@@ -34,8 +34,9 @@ LEARNING_RATE = 0.001
 MOMENTUM = 0.9
 SILENCE_THRESHOLD = None
 OUTPUT_DUR = 3 # Duration of generated audio in seconds
-CHECKPOINT_EVERY = 200
+CHECKPOINT_EVERY = 1
 CHECKPOINT_POLICY = 'All' # 'All' or 'Best'
+GENERATE = True
 SAMPLE_RATE = 22050 # Sample rate of generated audio
 SAMPLING_TEMPERATURE = 0.75
 SEED_OFFSET = 0
@@ -96,6 +97,8 @@ def get_arguments():
                                                         help='Policy for saving checkpoints')
     parser.add_argument('--resume',                     type=check_bool,     default=RESUME,
                                                         help='Whether to resume training from the last available checkpoint')
+    parser.add_argument('--generate',                   type=check_bool, default=GENERATE,
+                                                        help='Whether to generate audio output during training. Generation is aligned with checkpoints, meaning that audio is only generated after a new checkpoint has been created.')
     parser.add_argument('--max_generate_per_epoch',     type=check_positive, default=MAX_GENERATE_PER_EPOCH,
                                                         help='Maximum number of output files to generate at the end of each epoch')
     parser.add_argument('--temperature',                type=float,          default=SAMPLING_TEMPERATURE,
@@ -179,6 +182,9 @@ def main():
     generate_dir = os.path.join(args.output_dir, args.id)
     if not os.path.exists(generate_dir):
         os.makedirs(generate_dir)
+    # Time-stamped directory for the current run, which will be used to store
+    # checkpoints and summary files. We don't need to explicitly create it as we
+    # pass it to the TensorBoard callback, which creates it for us.
     rundir = '{}/{}'.format(logdir, datetime.now().strftime('%d.%m.%Y_%H.%M.%S'))
 
     # Load model configuration
@@ -197,6 +203,7 @@ def main():
         momentum=args.momentum,
     )
 
+    # Compile the model
     compute_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='accuracy')
     model.compile(optimizer=opt, loss=compute_loss, metrics=[train_accuracy])
@@ -232,6 +239,8 @@ def main():
 
     steps_per_epoch = get_steps_per_epoch()
 
+    # Custom training step callback (prints training stats and
+    # manages audio generation)
     class TrainingStepCallback(tf.keras.callbacks.Callback):
         def __init__(self):
             self.steps_per_epoch = get_steps_per_epoch()
@@ -245,6 +254,14 @@ def main():
 
         def on_epoch_begin(self, epoch, logs):
             self.epoch = epoch + 1
+            save_freq = args.checkpoint_every * get_steps_per_epoch()
+            if args.generate==True and (self.epoch > 1) and \
+                    ((self.epoch % save_freq == 1) or (args.checkpoint_every == 1)):
+                print('Generating samples for epoch {}...'.format(epoch))
+                ckpt_path = '{}/model.ckpt-{}'.format(rundir, epoch)
+                output_file_path = '{}/{}_epoch_{}.wav'.format(generate_dir, args.id, self.epoch)
+                generate(output_file_path, ckpt_path, config, args.max_generate_per_epoch, args.output_file_dur,
+                         args.sample_rate, args.temperature, args.seed, args.seed_offset)
 
         def on_batch_begin(self, batch, logs):
             if (batch + 1) % self.steps_per_batch == 1 : model.reset_states()
@@ -263,6 +280,7 @@ def main():
         if args.checkpoint_policy=='Best' \
         else '{0}/model.ckpt-{{epoch}}'.format(rundir)
 
+    # Callbacks
     callbacks = [
         tf.keras.callbacks.ModelCheckpoint(
             filepath=checkpoint_path,
