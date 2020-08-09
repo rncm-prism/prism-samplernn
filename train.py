@@ -157,13 +157,15 @@ def create_model(batch_size, config):
     )
 
 def get_latest_checkpoint(logdir):
-    rundirs = os.listdir(logdir)
-    if len(rundirs) > 0:
-        rundir_datetimes = []
-        for f in rundirs:
+    rundir_datetimes = []
+    try:
+        for f in os.listdir(logdir):
             if os.path.isdir(os.path.join(logdir, f)):
                 dt = datetime.strptime(f, '%d.%m.%Y_%H.%M.%S')
                 rundir_datetimes.append(dt)
+    except ValueError as err:
+        print(err)
+    if len(rundir_datetimes) > 0:
         latest_rundir = max(rundir_datetimes).strftime('%d.%m.%Y_%H.%M.%S')
         return tf.train.latest_checkpoint(os.path.join(logdir, latest_rundir))
 
@@ -187,6 +189,8 @@ def main():
     # pass it to the TensorBoard callback, which creates it for us.
     rundir = '{}/{}'.format(logdir, datetime.now().strftime('%d.%m.%Y_%H.%M.%S'))
 
+    latest_checkpoint = get_latest_checkpoint(logdir)
+
     # Load model configuration
     with open(args.config_file, 'r') as config_file:
         config = json.load(config_file)
@@ -209,7 +213,6 @@ def main():
     model.compile(optimizer=opt, loss=compute_loss, metrics=[train_accuracy])
 
     def get_initial_epoch():
-        latest_checkpoint = get_latest_checkpoint(logdir)
         if latest_checkpoint:
             epoch = int(latest_checkpoint.split('/')[-1].split('-')[-1])
         else:
@@ -248,7 +251,6 @@ def main():
             self.step_start_time = 0
 
         def on_train_begin(self, logs):
-            latest_checkpoint = get_latest_checkpoint(logdir)
             if args.resume==True and latest_checkpoint:
                 model.load_weights(latest_checkpoint)
 
@@ -258,7 +260,7 @@ def main():
             if args.generate==True and (self.epoch > 1) and \
                     ((self.epoch % save_freq == 1) or (args.checkpoint_every == 1)):
                 print('Generating samples for epoch {}...'.format(epoch))
-                ckpt_path = '{}/model.ckpt-{}'.format(rundir, epoch)
+                ckpt_path = get_latest_checkpoint(logdir)
                 output_file_path = '{}/{}_epoch_{}.wav'.format(generate_dir, args.id, self.epoch)
                 generate(output_file_path, ckpt_path, config, args.max_generate_per_epoch, args.output_file_dur,
                          args.sample_rate, args.temperature, args.seed, args.seed_offset)
@@ -286,7 +288,7 @@ def main():
             filepath=checkpoint_path,
             save_weights_only=True,
             save_best_only=args.checkpoint_policy=='Best',
-            save_freq=args.checkpoint_every * get_steps_per_epoch()),
+            save_freq=10), #args.checkpoint_every * get_steps_per_epoch()),
         TrainingStepCallback(),
         tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3),
         tf.keras.callbacks.TensorBoard(log_dir=rundir, update_freq=50)
