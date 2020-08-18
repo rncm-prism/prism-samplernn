@@ -3,6 +3,19 @@
 [PRiSM](https://www.rncm.ac.uk/research/research-centres-rncm/prism/) implementation of [SampleRNN: An Unconditional End-to-End Neural Audio Generation Model](https://arxiv.org/abs/1612.07837), for [TensorFlow 2](https://www.tensorflow.org/overview).
 
 -----------
+
+### UPDATES (10/08/20)
+
+* A new `--checkpoint_policy` parameter allows to set the policy for saving checkpoints - whether to only save the checkpoint when there has been an improvement in the training metrics (`Best`), or whether to always save them, regardless of changes to the metrics (`Always`).
+* Checkpoins for separate training 'runs' under the same id are saved to separate time-stamped directories (naming format `./logdir/<id>/<DD.MM.YYYY_HH.MM.SS>/`).
+* A new `--resume_from` training script parameter allows a previously saved checkpoint to be passed directly to the script.
+* The `--checkpoint_every` parameter now applies at the epoch level only.
+* The `--max_checkpoints` parameter, which determines the number of checkpoints retained on disk during training, can now be set to `None`, to retain all checkpoints (no maximum).
+* In-training audio generation can be switched off, through the new `--generate` parameter (`True` by default).
+* In-training audio generation, when enabled, is aligned with checkpointing frequency (determined by `--checkpoint_every`).
+* A new `--reduce_learning_rate_after` parameter allows for the learning rate to dynamically adjust itself during training, decaying exponentially after the specified number of epochs.
+
+-----------
 ### Table of Contents
 
 * [Features](https://github.com/rncm-prism/prism-samplernn#features)
@@ -17,6 +30,7 @@
     - [Statistics](https://github.com/rncm-prism/prism-samplernn#statistics)
     - [Command Line Arguments](https://github.com/rncm-prism/prism-samplernn#command-line-arguments)
     - [Configuring the Model](https://github.com/rncm-prism/prism-samplernn#configuring-the-model)
+    - [Resuming Training](https://github.com/rncm-prism/prism-samplernn#resuming-training)
 * [Generating Audio](https://github.com/rncm-prism/prism-samplernn#generating-audio)
 * [Resources](https://github.com/rncm-prism/prism-samplernn#resources)
 * [Acknowledgements](https://github.com/rncm-prism/prism-samplernn#acknowledgements)
@@ -100,7 +114,7 @@ python train.py \
   --sample_rate 16000
 ```
 
-Checkpoints storing the current state of the model are periodically saved to disk during training, with the default behaviour being to save a checkpoint at the end of each epoch. This interval may be modified through the `--checkpoint_every` parameter.  By default every checkpoint will be saved, but this behaviour can be controlled using the `--checkpoint_policy` parameter. Pass `Best` to save only the latest best checkpoint according to the training metrics (loss and accuracy). An audio file is also generated at the end of an epoch, which may be used to assess the progress of the training.
+Checkpoints storing the current state of the model are periodically saved to disk during training, with the default behaviour being to save a checkpoint at the end of each epoch. This interval may be modified through the `--checkpoint_every` parameter.  By default every checkpoint will be saved, but this behaviour can be controlled using the `--checkpoint_policy` parameter. Pass `Best` to save only the latest best checkpoint according to the training metrics (loss and accuracy). An audio file is also generated each time a checkpoint is saved, which may be used to assess the progress of the training (generation may be switched off by setting `--generate` to `False`).
 
 ### Statistics
 
@@ -116,30 +130,31 @@ The following table lists the hyper-parameters that may be passed at the command
 
 | Parameter Name             | Description           | Default Value  | Required?   |
 | ---------------------------|-----------------------|----------------| -----------|
-| `id`                     | Id for the training session          | `default`           | No        |
-| `data_dir`               | Path to the directory containing the training data           | None           | Yes        |
-| `verbose`                | Set training output verbosity. If `False` training step output is overwritten, if `True` (the default) it is written to a new line.           | None           | No        |
+| `id`                     | Id for the training session.          | `default`           | No        |
+| `data_dir`               | Path to the directory containing the training data.           | `None`           | Yes        |
+| `verbose`                | Set training output verbosity. If `False` training step output is overwritten, if `True` (the default) it is written to a new line.           | `None`           | No        |
 | `logdir_root`            | Location in which to store training log files and checkpoints. All such files are placed in a subdirectory with the id of the training session.           | `./logdir`           | No      |
-| `output_dir`             | Path to the directory for audio generated during training           | `./generated`           | No      |
+| `output_dir`             | Path to the directory for audio generated during training.           | `./generated`           | No      |
 | `config_file`            | File containing the configuration parameters for the training model. Note that this file must contain valid JSON, and should have a name that conforms to the `*.config.json` pattern. | `./default.config.json`         | No        |
-| `num_epochs`             | Number of epochs to run the training | 100           | No        |
+| `num_epochs`             | Number of epochs to run the training. | 100           | No        |
 | `batch_size`             | Size of the mini-batch. It is recommended that the batch size divide the length of the training corpus without remainder, otherwise the dataset will be truncated to the nearest multiple of the batch size. | 64         | No        |
-| `optimizer`              | TensorFlow optimizer to use for training (`adam`, `sgd` or `rmsprop`) | `adam`        | No        |
-| `learning_rate`          | Learning rate of the training optimizer   | 0.001         | No        |
-| `reduce_learning_rate_after`          | Exponentially reduce learning rate after this many epochs   | None         | No        |
-| `momentum`               | Momentum of the training optimizer (applies to `sgd` and `rmsprop` only)   | 0.9      | No        |
+| `optimizer`              | TensorFlow optimizer to use for training. (`adam`, `sgd` or `rmsprop`) | `adam`        | No        |
+| `learning_rate`          | Learning rate of the training optimizer.   | 0.001         | No        |
+| `reduce_learning_rate_after`          | Exponentially reduce learning rate after this many epochs.   | `None`         | No        |
+| `momentum`               | Momentum of the training optimizer (applies to `sgd` and `rmsprop` only).   | 0.9      | No        |
 | `checkpoint_every`       | Interval (in epochs) at which to generate a checkpoint file. Defaults to 1, for every epoch.   | 1      | No        |
-| `checkpoint_policy`      | Policy for saving checkpoints - `All` to save every checkpoint, or `Best` to save the latest best checkpoint   | `All`      | No        |
-| `resume`                 | Whether to resume training from the last available checkpoint   | `True`      | No        |
-| `generate`         | Whether to generate audio output during training. Generation is aligned with checkpoints, meaning that audio is only generated after a new checkpoint has been created.   | `True`      | No        |
-| `max_generate_per_epoch` | Maximum number of output files to generate at the end of each epoch   | 1      | No        |
-| `sample_rate`            | Sample rate of the generated audio | 22050         | No        |
-| `output_file_dur`        | Duration of generated audio files (in seconds) | 3         | No        |
-| `temperature`            | Sampling temperature for generated audio | 0.95         | No        |
-| `seed`                   | Path to audio for seeding when generating audio | None         | No        |
-| `seed_offset`            | Starting offset of the seed audio | 0         | No        |
-| `val_pcnt`               | Percentage of data to reserve for validation | 0.1         | No        |
-| `test_pcnt`              | Percentage of data to reserve for testing | 0.1         | No        |
+| `checkpoint_policy`      | Policy for saving checkpoints - `Always` to save at the epoch interval determined by the value of `checkpoint_every`, or `Best` to save only when the loss and accuracy have improved since the last save.   | `All`      | No        |
+| `max_checkpoints`        | Maximum number of checkpoints to keep on disk while training. Defaults to 5. Pass `None` to keep all checkpoints.   | 5      | No        |
+| `resume_from`            | Checkpoint from which to resume training.   | `None`      | No        |
+| `generate`               | Whether to generate audio output during training. Generation is aligned with checkpoints, meaning that audio is only generated after a new checkpoint has been created.   | `True`      | No        |
+| `max_generate_per_epoch` | Maximum number of output files to generate at the end of each epoch.   | 1      | No        |
+| `sample_rate`            | Sample rate of the generated audio. | 22050         | No        |
+| `output_file_dur`        | Duration of generated audio files (in seconds). | 3         | No        |
+| `temperature`            | Sampling temperature for generated audio. | 0.95         | No        |
+| `seed`                   | Path to audio for seeding when generating audio. | `None`         | No        |
+| `seed_offset`            | Starting offset of the seed audio. | 0         | No        |
+| `val_pcnt`               | Percentage of data to reserve for validation. | 0.1         | No        |
+| `test_pcnt`              | Percentage of data to reserve for testing. | 0.1         | No        |
 
 ### Configuring the Model
 
@@ -149,13 +164,17 @@ Model parameters are specified through a JSON configuration file, which may be p
 | -------------------------|-----------------------|----------------|
 | `seq_len`                | RNN sequence length. Note that the value must be evenly-divisible by the top tier frame size.        | 1024           |
 | `frame_sizes`            | Frame sizes (in samples) of the two upper tiers in the architecture, in ascending order. Note that the frame size of the upper tier must be an even multiple of that of the lower tier.  | [16,64]            |
-| `dim`                    | RNN hidden layer dimensionality          | 1024         |
-| `rnn_type`               | RNN type to use, either `gru` or `lstm`           | `gru`          | 
-| `num_rnn_layers`         | Depth of the RNN in each of the two upper tiers           | 4          |
-| `q_type`                 | Quantization type (`mu-law` or `linear`)          | `mu-law`          |
-| `q_levels`               | Number of quantization channels (note that if `q_type` is `mu-law` this parameter is ignored, as mu-law quantization requires 256 channels)     | 256           |
-| `emb_size`               | Size of the embedding layer in the bottom tier (sample-level MLP)         | 256          |
-| `skip_conn`              | Whether to add skip connections to the model's RNN layers        | `False`          |
+| `dim`                    | RNN hidden layer dimensionality.          | 1024         |
+| `rnn_type`               | RNN type to use, either `gru` or `lstm`.           | `gru`          | 
+| `num_rnn_layers`         | Depth of the RNN in each of the two upper tiers.           | 4          |
+| `q_type`                 | Quantization type (`mu-law` or `linear`).          | `mu-law`          |
+| `q_levels`               | Number of quantization channels (note that if `q_type` is `mu-law` this parameter is ignored, as mu-law quantization requires 256 channels).     | 256           |
+| `emb_size`               | Size of the embedding layer in the bottom tier (sample-level MLP).         | 256          |
+| `skip_conn`              | Whether to add skip connections to the model's RNN layers.        | `False`          |
+
+### Resuming Training
+
+A training session that has been halted, perhaps by `Ctrl-C`, may be resumed from a previously saved checkpoint. The weights saved to the checkpoint will be loaded into a fresh model, resuming at the last epoch + 1. To enable this set `--resume` to `True`, and optionally the path to a checkpoint through the `--resume_from` parameter (ignored when `--resume` is `False`). If no such checkpoint is supplied the program will search through any previous training run directories for the latest checkpoint. If no checkpoint is found training will begin again from scratch.
 
 -----------
 
@@ -185,15 +204,15 @@ The following is the full list of command line parameters for generate.py:
 
 | Parameter Name             | Description           | Default Value  | Required?   |
 | ---------------------------|-----------------------|----------------| -----------|
-| `output_path`              | Path to the generated .wav file          | None           | Yes        |
-| `checkpoint_path`          | Path to a saved checkpoint for the model           | None           | Yes        |
-| `config_file`              | Path to the JSON config for the model          | None           | Yes        |
-| `dur`                      | Duration of generated audio           | 3           | No       |
-| `num_seqs`                 | Number of audio sequences to generate          | 1           | No        |
-| `sample_rate`              | Sample rate of the generated audio          | 44100           | No        |
-| `temperature`              | Sampling temperature for generated audio | 0.95         | No        |
-| `seed`                     | Path to audio for seeding when generating audio | None         | No        |
-| `seed_offset`              | Starting offset of the seed audio | 0         | No        |
+| `output_path`              | Path to the generated .wav file.          | `None`           | Yes        |
+| `checkpoint_path`          | Path to a saved checkpoint for the model.           | `None`           | Yes        |
+| `config_file`              | Path to the JSON config for the model.          | `None`           | Yes        |
+| `dur`                      | Duration of generated audio.           | 3           | No       |
+| `num_seqs`                 | Number of audio sequences to generate.          | 1           | No        |
+| `sample_rate`              | Sample rate of the generated audio.          | 44100           | No        |
+| `temperature`              | Sampling temperature for generated audio. | 0.95         | No        |
+| `seed`                     | Path to audio for seeding when generating audio. | `None`         | No        |
+| `seed_offset`              | Starting offset of the seed audio. | 0         | No        |
 
 -----------
 

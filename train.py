@@ -18,10 +18,11 @@ tf.autograph.set_verbosity(3)
 
 import numpy as np
 import librosa
+from natsort import natsorted
 
 from samplernn import (SampleRNN, find_files, quantize)
 from dataset import get_dataset
-from generate import generate
+from checkpoints import (TrainingStepCallback, ModelCheckpointCallback)
 
 
 # https://github.com/ibab/tensorflow-wavenet/issues/255
@@ -35,13 +36,13 @@ MOMENTUM = 0.9
 SILENCE_THRESHOLD = None
 OUTPUT_DUR = 3 # Duration of generated audio in seconds
 CHECKPOINT_EVERY = 1
-CHECKPOINT_POLICY = 'All' # 'All' or 'Best'
+CHECKPOINT_POLICY = 'Always' # 'Always' or 'Best'
+MAX_CHECKPOINTS = 5
 GENERATE = True
 SAMPLE_RATE = 22050 # Sample rate of generated audio
 SAMPLING_TEMPERATURE = 0.75
 SEED_OFFSET = 0
 MAX_GENERATE_PER_EPOCH = 1
-RESUME = True
 VAL_PCNT = 0.1
 TEST_PCNT = 0.1
 
@@ -63,6 +64,12 @@ def get_arguments():
              raise argparse.ArgumentTypeError("%s is not positive" % value)
         return val
 
+    def check_max_checkpoints(value):
+        if str(value).upper() != 'NONE':
+            return check_positive(value)
+        else:
+            return None
+
     parser = argparse.ArgumentParser(description='PRiSM TensorFlow SampleRNN')
     parser.add_argument('--data_dir',                   type=str,            required=True,
                                                         help='Path to the directory containing the training data')
@@ -82,8 +89,6 @@ def get_arguments():
                                                         help='Sample rate of the generated audio')
     parser.add_argument('--num_epochs',                 type=check_positive, default=NUM_EPOCHS,
                                                         help='Number of training epochs')
-    parser.add_argument('--checkpoint_every',           type=check_positive, default=CHECKPOINT_EVERY,
-                                                        help='Interval (in epochs) at which to generate a checkpoint file')
     parser.add_argument('--optimizer',                  type=str,            default='adam', choices=optimizer_factory.keys(),
                                                         help='Type of training optimizer to use')
     parser.add_argument('--learning_rate',              type=float,          default=LEARNING_RATE,
@@ -93,11 +98,15 @@ def get_arguments():
     parser.add_argument('--momentum',                   type=float,          default=MOMENTUM,
                                                         help='Optimizer momentum')
     #parser.add_argument('--silence_threshold',          type=float,          default=SILENCE_THRESHOLD)
-    parser.add_argument('--checkpoint_policy',          type=str, default=CHECKPOINT_POLICY, choices=['All', 'Best'],
+    parser.add_argument('--checkpoint_every',           type=check_positive, default=CHECKPOINT_EVERY,
+                                                        help='Interval (in epochs) at which to generate a checkpoint file')
+    parser.add_argument('--checkpoint_policy',          type=str, default=CHECKPOINT_POLICY, choices=['Always', 'Best'],
                                                         help='Policy for saving checkpoints')
-    parser.add_argument('--resume',                     type=check_bool,     default=RESUME,
-                                                        help='Whether to resume training from the last available checkpoint')
-    parser.add_argument('--generate',                   type=check_bool, default=GENERATE,
+    parser.add_argument('--max_checkpoints',            type=check_max_checkpoints, default=MAX_CHECKPOINTS,
+                                                        help='Number of checkpoints to keep on disk while training. Defaults to 5. Pass None to keep all checkpoints.')
+    parser.add_argument('--resume',                     type=check_bool, help='Whether to resume training. When True the latest checkpoint from any previous runs will be used, unless a specific checkpoint is passed using the resume_from parameter.')
+    parser.add_argument('--resume_from',                type=str, help='Checkpoint from which to resume training. Ignored when resume is False.')
+    parser.add_argument('--generate',                   type=check_bool,     default=GENERATE,
                                                         help='Whether to generate audio output during training. Generation is aligned with checkpoints, meaning that audio is only generated after a new checkpoint has been created.')
     parser.add_argument('--max_generate_per_epoch',     type=check_positive, default=MAX_GENERATE_PER_EPOCH,
                                                         help='Maximum number of output files to generate at the end of each epoch')
@@ -166,8 +175,21 @@ def get_latest_checkpoint(logdir):
     except ValueError as err:
         print(err)
     if len(rundir_datetimes) > 0:
-        latest_rundir = max(rundir_datetimes).strftime('%d.%m.%Y_%H.%M.%S')
-        return tf.train.latest_checkpoint(os.path.join(logdir, latest_rundir))
+        i = 0
+        rundir_datetimes = natsorted(rundir_datetimes, reverse=True)
+        latest_checkpoint = None
+        while (i < len(rundir_datetimes)) and (latest_checkpoint == None):
+            rundir = rundir_datetimes[i].strftime('%d.%m.%Y_%H.%M.%S')
+            latest_checkpoint = tf.train.latest_checkpoint(os.path.join(logdir, rundir))
+            i += 1
+        return latest_checkpoint
+
+def get_initial_epoch(ckpt_path):
+    if ckpt_path:
+        epoch = int(ckpt_path.split('/')[-1].split('-')[-1])
+    else:
+        epoch = 0
+    return epoch
 
 def main():
     args = get_arguments()
@@ -186,7 +208,7 @@ def main():
         os.makedirs(generate_dir)
     # Time-stamped directory for the current run, which will be used to store
     # checkpoints and summary files. We don't need to explicitly create it as we
-    # pass it to the TensorBoard callback, which creates it for us.
+    # pass the name to the TensorBoard callback, which creates it for us.
     rundir = '{}/{}'.format(logdir, datetime.now().strftime('%d.%m.%Y_%H.%M.%S'))
 
     latest_checkpoint = get_latest_checkpoint(logdir)
@@ -194,6 +216,7 @@ def main():
     # Load model configuration
     with open(args.config_file, 'r') as config_file:
         config = json.load(config_file)
+    # Create the model
     model = create_model(args.batch_size, config)
 
     seq_len = model.seq_len
@@ -212,15 +235,10 @@ def main():
     train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='accuracy')
     model.compile(optimizer=opt, loss=compute_loss, metrics=[train_accuracy])
 
-    def get_initial_epoch():
-        if latest_checkpoint:
-            epoch = int(latest_checkpoint.split('/')[-1].split('-')[-1])
-        else:
-            epoch = 0
-        return epoch
+    resume_from = (args.resume_from or latest_checkpoint) if args.resume==True else None
 
-    initial_epoch = get_initial_epoch()
-    dataset = get_dataset(args.data_dir, args.num_epochs - initial_epoch, args.batch_size, seq_len, overlap)
+    initial_epoch = get_initial_epoch(resume_from)
+    dataset = get_dataset(args.data_dir, args.num_epochs-initial_epoch, args.batch_size, seq_len, overlap)
 
     # Dataset iterator
     def train_iter():
@@ -231,65 +249,45 @@ def main():
                 y = x[:, overlap : overlap+seq_len]
                 yield (x, y)
 
-    def get_steps_per_batch():
-        (samples, _) = librosa.load(files[0], sr=None, mono=True)
-        return int(np.floor(len(samples) / float(seq_len)))
+    # This computes subseqs per batch...
+    samples0, _ = librosa.load(files[0], sr=None, mono=True)
+    steps_per_batch = int(np.floor(len(samples0) / float(seq_len)))
 
-    def get_steps_per_epoch():
-        num_batches = dataset_size // args.batch_size
-        steps_per_batch = get_steps_per_batch()
-        return num_batches * steps_per_batch
+    steps_per_epoch = dataset_size // args.batch_size * steps_per_batch
 
-    steps_per_epoch = get_steps_per_epoch()
-
-    # Custom training step callback (prints training stats and
-    # manages audio generation)
-    class TrainingStepCallback(tf.keras.callbacks.Callback):
-        def __init__(self):
-            self.steps_per_epoch = get_steps_per_epoch()
-            self.steps_per_batch = get_steps_per_batch()
-            self.step_start_time = 0
-
-        def on_train_begin(self, logs):
-            if args.resume==True and latest_checkpoint:
-                model.load_weights(latest_checkpoint)
-
-        def on_epoch_begin(self, epoch, logs):
-            self.epoch = epoch + 1
-            save_freq = args.checkpoint_every * get_steps_per_epoch()
-            if args.generate==True and (self.epoch > 1) and \
-                    ((self.epoch % save_freq == 1) or (args.checkpoint_every == 1)):
-                print('Generating samples for epoch {}...'.format(epoch))
-                ckpt_path = get_latest_checkpoint(logdir)
-                output_file_path = '{}/{}_epoch_{}.wav'.format(generate_dir, args.id, self.epoch)
-                generate(output_file_path, ckpt_path, config, args.max_generate_per_epoch, args.output_file_dur,
-                         args.sample_rate, args.temperature, args.seed, args.seed_offset)
-
-        def on_batch_begin(self, batch, logs):
-            if (batch + 1) % self.steps_per_batch == 1 : model.reset_states()
-            self.step_start_time = time.time()
-
-        def on_batch_end(self, batch, logs):
-            loss, acc = logs.get('loss'), logs.get('accuracy')
-            step_duration = time.time() - self.step_start_time
-            template = 'Epoch: {:d}/{:d}, Step: {:d}/{:d}, Loss: {:.3f}, Accuracy: {:.3f}, ({:.3f} sec/step)'
-            end_char = '\r' if (args.verbose == False) and (batch + 1 != self.steps_per_epoch) else '\n'
-            stats_string = template.format(self.epoch, args.num_epochs, batch + 1, self.steps_per_epoch, loss, acc * 100, step_duration)
-            print(stats_string, end=end_char)
-
-
-    checkpoint_path = '{0}/model.ckpt'.format(rundir) \
-        if args.checkpoint_policy=='Best' \
-        else '{0}/model.ckpt-{{epoch}}'.format(rundir)
+    # Arguments passed to the generate function called
+    # by the ModelCheckpointCallback...
+    generation_args = {
+        'generate_dir' : generate_dir,
+        'id' : args.id,
+        'config' : config,
+        'num_seqs' : args.max_generate_per_epoch,
+        'dur' : args.output_file_dur,
+        'sample_rate' : args.sample_rate,
+        'temperature' : args.temperature,
+        'seed' : args.seed,
+        'seed_offset' : args.seed_offset
+    }
 
     # Callbacks
     callbacks = [
-        tf.keras.callbacks.ModelCheckpoint(
-            filepath=checkpoint_path,
-            save_weights_only=True,
-            save_best_only=args.checkpoint_policy=='Best',
-            save_freq=10), #args.checkpoint_every * get_steps_per_epoch()),
-        TrainingStepCallback(),
+        TrainingStepCallback(
+            model = model,
+            num_epochs = args.num_epochs,
+            steps_per_epoch = steps_per_epoch,
+            steps_per_batch = steps_per_batch,
+            resume_from = resume_from,
+            verbose = args.verbose),
+        ModelCheckpointCallback(
+            dir = rundir,
+            max_to_keep = args.max_checkpoints,
+            generate = args.generate,
+            generation_args = generation_args,
+            filepath = '{0}/model.ckpt-{{epoch}}'.format(rundir),
+            monitor = 'loss',
+            save_weights_only = True,
+            save_best_only = args.checkpoint_policy.lower()=='best',
+            save_freq = args.checkpoint_every * steps_per_epoch),
         tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3),
         tf.keras.callbacks.TensorBoard(log_dir=rundir, update_freq=50)
     ]
@@ -320,7 +318,7 @@ def main():
             verbose=0,
         )
     except KeyboardInterrupt:
-        print()
+        print('\n')
         print('Keyboard interrupt')
         print()
 
