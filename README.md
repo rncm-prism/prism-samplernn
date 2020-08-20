@@ -10,7 +10,7 @@
    - The `--input_file` and `--output_dir` arguments were previously positional, now they are named arguments.
    - It is no longer necessary to create the output directory beforehand, it will be created it if it does not exist (also no trailing slash is required when supplying the path to the directory).
    - The script output now reports when a chunk is silent and will be omitted.
-   - When the script completes the number of chunks processed and number of chunks omitted (for silence) is reported.
+   - When complete the script now reports the number of chunks processed and number of chunks omitted (for silence).
 * A new `--checkpoint_policy` parameter allows to set the policy for saving checkpoints - whether to only save the checkpoint when there has been an improvement in the training metrics (`Best`), or whether to always save them, regardless of changes to the metrics (`Always`).
 * Checkpoins for separate training 'runs' under the same id are saved to separate time-stamped directories (naming format `./logdir/<id>/<DD.MM.YYYY_HH.MM.SS>/`).
 * A new `--resume_from` training script parameter allows a previously saved checkpoint to be passed directly to the script.
@@ -19,7 +19,7 @@
 * In-training audio generation can be switched off, through the new `--generate` parameter (`True` by default).
 * In-training audio generation, when enabled, is aligned with checkpointing frequency (determined by `--checkpoint_every`).
 * A new `--reduce_learning_rate_after` parameter allows for the learning rate to dynamically adjust itself during training, decaying exponentially after the specified number of epochs.
-* A new `--early_stopping_patience` determines the number of epochs without improvement after which training is automatically terminated (defaults to 3).
+* A new `--early_stopping_patience` parameter determines the number of epochs without improvement after which training is automatically terminated (defaults to 3).
 
 -----------
 ### Table of Contents
