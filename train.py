@@ -38,6 +38,9 @@ OUTPUT_DUR = 3 # Duration of generated audio in seconds
 CHECKPOINT_EVERY = 1
 CHECKPOINT_POLICY = 'Always' # 'Always' or 'Best'
 MAX_CHECKPOINTS = 5
+RESUME = True
+REDUCE_LEARNING_RATE_AFTER = 10
+EARLY_STOPPING_PATIENCE = 3
 GENERATE = True
 SAMPLE_RATE = 22050 # Sample rate of generated audio
 SAMPLING_TEMPERATURE = 0.75
@@ -93,19 +96,21 @@ def get_arguments():
                                                         help='Type of training optimizer to use')
     parser.add_argument('--learning_rate',              type=float,          default=LEARNING_RATE,
                                                         help='Learning rate of training')
-    parser.add_argument('--reduce_learning_rate_after', type=int,
+    parser.add_argument('--reduce_learning_rate_after', type=check_positive, default=REDUCE_LEARNING_RATE_AFTER,
                                                         help='Exponentially reduce learning rate after this many epochs')
     parser.add_argument('--momentum',                   type=float,          default=MOMENTUM,
                                                         help='Optimizer momentum')
-    #parser.add_argument('--silence_threshold',          type=float,          default=SILENCE_THRESHOLD)
     parser.add_argument('--checkpoint_every',           type=check_positive, default=CHECKPOINT_EVERY,
                                                         help='Interval (in epochs) at which to generate a checkpoint file')
     parser.add_argument('--checkpoint_policy',          type=str, default=CHECKPOINT_POLICY, choices=['Always', 'Best'],
                                                         help='Policy for saving checkpoints')
     parser.add_argument('--max_checkpoints',            type=check_max_checkpoints, default=MAX_CHECKPOINTS,
                                                         help='Number of checkpoints to keep on disk while training. Defaults to 5. Pass None to keep all checkpoints.')
-    parser.add_argument('--resume',                     type=check_bool, help='Whether to resume training. When True the latest checkpoint from any previous runs will be used, unless a specific checkpoint is passed using the resume_from parameter.')
+    parser.add_argument('--resume',                     type=check_bool,     default=RESUME,
+                                                        help='Whether to resume training. When True the latest checkpoint from any previous runs will be used, unless a specific checkpoint is passed using the resume_from parameter.')
     parser.add_argument('--resume_from',                type=str, help='Checkpoint from which to resume training. Ignored when resume is False.')
+    parser.add_argument('--early_stopping_patience',    type=check_positive, default=EARLY_STOPPING_PATIENCE,
+                                                        help='Number of epochs with no improvement after which training will be stopped.')
     parser.add_argument('--generate',                   type=check_bool,     default=GENERATE,
                                                         help='Whether to generate audio output during training. Generation is aligned with checkpoints, meaning that audio is only generated after a new checkpoint has been created.')
     parser.add_argument('--max_generate_per_epoch',     type=check_positive, default=MAX_GENERATE_PER_EPOCH,
@@ -288,8 +293,11 @@ def main():
             save_weights_only = True,
             save_best_only = args.checkpoint_policy.lower()=='best',
             save_freq = args.checkpoint_every * steps_per_epoch),
-        tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3),
-        tf.keras.callbacks.TensorBoard(log_dir=rundir, update_freq=50)
+        tf.keras.callbacks.EarlyStopping(
+            monitor = 'loss',
+            patience = args.early_stopping_patience),
+        tf.keras.callbacks.TensorBoard(
+            log_dir = rundir, update_freq = 50)
     ]
 
     reduce_lr_after = args.reduce_learning_rate_after

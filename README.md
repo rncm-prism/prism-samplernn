@@ -4,8 +4,13 @@
 
 -----------
 
-### UPDATES (10/08/20)
+### UPDATES (20/08/20)
 
+* Changes to the `chunk_audio.py` script:
+   - The `--input_file` and `--output_dir` arguments were previously positional, now they are named arguments.
+   - It is no longer necessary to create the output directory beforehand, it will be created it if it does not exist (also no trailing slash is required when supplying the path to the directory).
+   - The script output now reports when a chunk is silent and will be omitted.
+   - When the script completes the number of chunks processed and number of chunks omitted (for silence) is reported.
 * A new `--checkpoint_policy` parameter allows to set the policy for saving checkpoints - whether to only save the checkpoint when there has been an improvement in the training metrics (`Best`), or whether to always save them, regardless of changes to the metrics (`Always`).
 * Checkpoins for separate training 'runs' under the same id are saved to separate time-stamped directories (naming format `./logdir/<id>/<DD.MM.YYYY_HH.MM.SS>/`).
 * A new `--resume_from` training script parameter allows a previously saved checkpoint to be passed directly to the script.
@@ -14,6 +19,7 @@
 * In-training audio generation can be switched off, through the new `--generate` parameter (`True` by default).
 * In-training audio generation, when enabled, is aligned with checkpointing frequency (determined by `--checkpoint_every`).
 * A new `--reduce_learning_rate_after` parameter allows for the learning rate to dynamically adjust itself during training, decaying exponentially after the specified number of epochs.
+* A new `--early_stopping_patience` determines the number of epochs without improvement after which training is automatically terminated (defaults to 3).
 
 -----------
 ### Table of Contents
@@ -94,10 +100,16 @@ The architecture of the network conforms to the three-tier design proposed in th
 ### Preparing Data
 
 SampleRNN is designed to accept raw audio in the form of .wav files. We therefore need to preprocess our source .wav file by slicing it into chunks, using the supplied [chunk_audio.py](https://bitbucket.org/cmelen/prism-samplernn.py/master/chunk_audio.py) script:
+
+```shell
+python chunk_audio.py \
+  --input_file path/to/input.wav \
+  --output_dir ./chunks \
+  --chunk_length 8000 \
+  --overlap 1000
 ```
-python chunk_audio.py <path_to_input_wav> ./chunks/ --chunk_length 8000 --overlap 1000
-```
-The second argument (required) is the path to the directory to contain the chunks - note the trailing slash (required, otherwise the chunks will be created in the current directory). You will need to create this directory (the above places the chunks in a sub-directory called 'chunks' within the current directory). The script has two optional arguments for setting the chunk_length (defaults to 8000 ms), and an overlap between consecutive chunks (defaults to 0 ms, no overlap).
+
+The `--output_dir` argument specifies the path to the directory to contain the chunks. The directory will be created if it doesn't already exist (the above places the chunks in a sub-directory called 'chunks' within the current directory). The script has two optional arguments for setting the chunk length (defaults to 8000 ms), and an overlap between consecutive chunks (defaults to 0 ms, no overlap).
 
 ### Running the Script
 
@@ -144,8 +156,10 @@ The following table lists the hyper-parameters that may be passed at the command
 | `momentum`               | Momentum of the training optimizer (applies to `sgd` and `rmsprop` only).   | 0.9      | No        |
 | `checkpoint_every`       | Interval (in epochs) at which to generate a checkpoint file. Defaults to 1, for every epoch.   | 1      | No        |
 | `checkpoint_policy`      | Policy for saving checkpoints - `Always` to save at the epoch interval determined by the value of `checkpoint_every`, or `Best` to save only when the loss and accuracy have improved since the last save.   | `All`      | No        |
-| `max_checkpoints`        | Maximum number of checkpoints to keep on disk while training. Defaults to 5. Pass `None` to keep all checkpoints.   | 5      | No        |
-| `resume_from`            | Checkpoint from which to resume training.   | `None`      | No        |
+| `max_checkpoints`        | Maximum number of checkpoints to keep on disk during training. Defaults to 5. Pass `None` to keep all checkpoints.   | 5      | No        |
+| `resume`                 | Whether to resume training, either from the last available checkpoint or from one supplied using the `resume_from` parameter.   | `True`      | No        |
+| `resume_from`            | Checkpoint from which to resume training. Ignored when `resume` is `False`.   | `None`      | No        |
+| `early_stopping_patience`| Number of epochs with no improvement after which training will be stopped.   | 3      | No        |
 | `generate`               | Whether to generate audio output during training. Generation is aligned with checkpoints, meaning that audio is only generated after a new checkpoint has been created.   | `True`      | No        |
 | `max_generate_per_epoch` | Maximum number of output files to generate at the end of each epoch.   | 1      | No        |
 | `sample_rate`            | Sample rate of the generated audio. | 22050         | No        |
