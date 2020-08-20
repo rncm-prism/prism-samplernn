@@ -39,7 +39,6 @@ CHECKPOINT_EVERY = 1
 CHECKPOINT_POLICY = 'Always' # 'Always' or 'Best'
 MAX_CHECKPOINTS = 5
 RESUME = True
-REDUCE_LEARNING_RATE_AFTER = 10
 EARLY_STOPPING_PATIENCE = 3
 GENERATE = True
 SAMPLE_RATE = 22050 # Sample rate of generated audio
@@ -96,8 +95,7 @@ def get_arguments():
                                                         help='Type of training optimizer to use')
     parser.add_argument('--learning_rate',              type=float,          default=LEARNING_RATE,
                                                         help='Learning rate of training')
-    parser.add_argument('--reduce_learning_rate_after', type=check_positive, default=REDUCE_LEARNING_RATE_AFTER,
-                                                        help='Exponentially reduce learning rate after this many epochs')
+    parser.add_argument('--reduce_learning_rate_after', type=check_positive, help='Exponentially reduce learning rate after this many epochs')
     parser.add_argument('--momentum',                   type=float,          default=MOMENTUM,
                                                         help='Optimizer momentum')
     parser.add_argument('--checkpoint_every',           type=check_positive, default=CHECKPOINT_EVERY,
@@ -302,7 +300,7 @@ def main():
 
     reduce_lr_after = args.reduce_learning_rate_after
 
-    if reduce_lr_after is not None and reduce_lr_after > 0:
+    if reduce_lr_after and reduce_lr_after > 0:
         def scheduler(epoch, leaning_rate):
             if epoch < reduce_lr_after:
                 return leaning_rate
