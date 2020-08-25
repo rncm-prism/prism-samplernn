@@ -73,7 +73,7 @@ class ModelCheckpointCallback(tf.keras.callbacks.ModelCheckpoint):
         ckpt_path = tf.train.latest_checkpoint(self.dir)
         # Track saved checkpoints, and remove old ones...
         if self.max_to_keep:
-            if ckpt_path not in self._maybe_delete:
+            if ckpt_path and ckpt_path not in self._maybe_delete:
                 self._maybe_delete.append(ckpt_path)
             self._sweep()
         # Generate audio...
