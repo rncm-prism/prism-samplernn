@@ -155,7 +155,7 @@ def create_inference_model(ckpt_path, num_seqs, config):
     num_samps = config['seq_len'] + model.big_frame_size
     init_data = np.zeros((model.batch_size, num_samps, 1), dtype='int32')
     model(init_data)
-    model.load_weights(ckpt_path)
+    model.load_weights(ckpt_path).expect_partial()
     return model
 
 
