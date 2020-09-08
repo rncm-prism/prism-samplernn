@@ -1,6 +1,9 @@
 import tensorflow as tf
+import numpy as np
+import time
 from .sample_mlp import SampleMLP
 from .frame_rnn import FrameRNN
+from .utils import unsqueeze
 
 
 class SampleRNN(tf.keras.Model):
@@ -61,19 +64,57 @@ class SampleRNN(tf.keras.Model):
         self.compiled_metrics.update_state(target, prediction)
         return {metric.name: metric.result() for metric in self.metrics}
 
-    def call(self, inputs):
-        # UPPER TIER
-        big_frame_outputs = self.big_frame_rnn(
-            tf.cast(inputs, tf.float32)[:, : -self.big_frame_size, :]
-        )
-        # MIDDLE TIER
-        frame_outputs = self.frame_rnn(
-            tf.cast(inputs, tf.float32)[:, self.big_frame_size-self.frame_size : -self.frame_size, :],
-            conditioning_frames=big_frame_outputs,
-        )
-        # LOWER TIER (SAMPLES)
-        sample_output = self.sample_mlp(
-            inputs[:, self.big_frame_size - self.frame_size : -1, :],
-            conditioning_frames=frame_outputs,
-        )
-        return sample_output
+    # Sampling function
+    def sample(self, samples, temperature):
+        samples = tf.nn.log_softmax(samples)
+        samples = tf.cast(samples, tf.float64)
+        samples = samples / temperature
+        sample = tf.random.categorical(samples, 1)
+        return tf.cast(sample, tf.int32)
+
+    # Inference
+    @tf.function
+    def inference_step(self, inputs, temperature):
+        num_samps = self.big_frame_size
+        samples = inputs
+        big_frame_outputs = self.big_frame_rnn(tf.cast(inputs, tf.float32))
+        for t in range(num_samps, num_samps * 2):
+            if t % self.frame_size == 0:
+                frame_inputs = samples[:, t - self.frame_size : t, :]
+                big_frame_output_idx = (t // self.frame_size) % (
+                    self.big_frame_size // self.frame_size
+                )
+                frame_outputs = self.frame_rnn(
+                    tf.cast(frame_inputs, tf.float32),
+                    conditioning_frames=unsqueeze(big_frame_outputs[:, big_frame_output_idx, :], 1))
+            sample_inputs = samples[:, t - self.frame_size : t, :]
+            frame_output_idx = t % self.frame_size
+            sample_outputs = self.sample_mlp(
+                sample_inputs,
+                conditioning_frames=unsqueeze(frame_outputs[:, frame_output_idx, :], 1))
+            # Generate
+            sample_outputs = tf.reshape(sample_outputs, [-1, self.q_levels])
+            generated = self.sample(sample_outputs, temperature)
+            generated = tf.reshape(generated, [self.batch_size, 1, 1])
+            samples = tf.concat([samples, generated], axis=1)
+        return samples[:, num_samps:]
+
+    def call(self, inputs, training=True, temperature=1.0):
+        if training==True:
+            # UPPER TIER
+            big_frame_outputs = self.big_frame_rnn(
+                tf.cast(inputs, tf.float32)[:, : -self.big_frame_size, :]
+            )
+            # MIDDLE TIER
+            frame_outputs = self.frame_rnn(
+                tf.cast(inputs, tf.float32)[:, self.big_frame_size-self.frame_size : -self.frame_size, :],
+                conditioning_frames=big_frame_outputs,
+            )
+            # LOWER TIER (SAMPLES)
+            sample_output = self.sample_mlp(
+                inputs[:, self.big_frame_size - self.frame_size : -1, :],
+                conditioning_frames=frame_outputs,
+            )
+            return sample_output
+        else:
+            return self.inference_step(inputs, temperature)

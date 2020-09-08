@@ -53,8 +53,17 @@ def get_arguments():
 # Very interesting article on sampling temperature (including the idea of varying it
 # while sampling): https://www.robinsloan.com/expressive-temperature/
 
-def generate_and_save_samples(model, path, seed, seed_offset=0, dur=OUTPUT_DUR,
+'''
+def generate_and_save_samples_OLD(model, path, seed, seed_offset=0, dur=OUTPUT_DUR,
                               sample_rate=SAMPLE_RATE, temperature=SAMPLING_TEMPERATURE):
+
+    # Sampling function
+    def sample(samples, temperature=SAMPLING_TEMPERATURE):
+        samples = tf.nn.log_softmax(samples)
+        samples = tf.cast(samples, tf.float64)
+        samples = samples / temperature
+        return tf.random.categorical(samples, 1)
+
     q_type = model.q_type
     q_levels = model.q_levels
     q_zero = q_levels // 2
@@ -122,35 +131,20 @@ def generate_and_save_samples(model, path, seed, seed_offset=0, dur=OUTPUT_DUR,
         write_wav(file_name, audio, sample_rate)
         print('Generated sample output to {}'.format(file_name))
     print('Done')
-
-
-# Sampling function
-def sample(samples, temperature=SAMPLING_TEMPERATURE):
-    samples = tf.nn.log_softmax(samples)
-    samples = tf.cast(samples, tf.float64)
-    samples = samples / temperature
-    return tf.random.categorical(samples, 1)
-
-
-def load_seed_audio(path, offset, length):
-    (audio, _) = librosa.load(path, sr=None, mono=True)
-    assert offset + length <= len(audio), 'Seed offset plus length exceeds audio length'
-    chunk = audio[offset : offset + length]
-    return chunk.reshape(-1, 1)
-
+'''
 
 def create_inference_model(ckpt_path, num_seqs, config):
     model = SampleRNN(
-        batch_size=num_seqs, # Generate sequences in batches
-        frame_sizes=config['frame_sizes'],
-        seq_len=config['seq_len'],
-        q_type=config['q_type'],
-        q_levels=config['q_levels'],
-        dim=config['dim'],
-        rnn_type=config.get('rnn_type'),
-        num_rnn_layers=config['num_rnn_layers'],
-        emb_size=config['emb_size'],
-        skip_conn=config.get('skip_conn')
+        batch_size = num_seqs, # Generate sequences in batches
+        frame_sizes = config['frame_sizes'],
+        seq_len = config['seq_len'],
+        q_type = config['q_type'],
+        q_levels = config['q_levels'],
+        dim = config['dim'],
+        rnn_type = config.get('rnn_type'),
+        num_rnn_layers = config['num_rnn_layers'],
+        emb_size = config['emb_size'],
+        skip_conn = config.get('skip_conn')
     )
     num_samps = config['seq_len'] + model.big_frame_size
     init_data = np.zeros((model.batch_size, num_samps, 1), dtype='int32')
@@ -158,11 +152,53 @@ def create_inference_model(ckpt_path, num_seqs, config):
     model.load_weights(ckpt_path).expect_partial()
     return model
 
+def load_seed_audio(path, offset, length):
+    (audio, _) = librosa.load(path, sr=None, mono=True)
+    assert offset + length <= len(audio), 'Seed offset plus length exceeds audio length'
+    chunk = audio[offset : offset + length]
+    return chunk.reshape(-1, 1)
+
+NUM_FRAMES_TO_PRINT = 4
 
 def generate(path, ckpt_path, config, num_seqs=NUM_SEQS, dur=OUTPUT_DUR, sample_rate=SAMPLE_RATE,
              temperature=SAMPLING_TEMPERATURE, seed=None, seed_offset=None):
     model = create_inference_model(ckpt_path, num_seqs, config)
-    generate_and_save_samples(model, path, seed, seed_offset, dur, sample_rate, temperature)
+    q_type = model.q_type
+    q_levels = model.q_levels
+    q_zero = q_levels // 2
+    num_samps = dur * sample_rate
+    # Precompute sample sequences, initialised to q_zero.
+    samples = []
+    init_samples = tf.fill((model.batch_size, model.big_frame_size, 1), q_zero)
+    # Set seed if provided.
+    if seed is not None:
+        seed_audio = load_seed_audio(seed, seed_offset, model.big_frame_size)
+        init_samples[:, :model.big_frame_size, :] = quantize(seed_audio, q_type, q_levels)
+    samples.append(init_samples)
+    print_progress_every = NUM_FRAMES_TO_PRINT * model.big_frame_size
+    start_time = time.time()
+    for i in range(0, num_samps // model.big_frame_size):
+        t = i * model.big_frame_size
+        # Generate samples
+        frame_samples = model(samples[i], training=False, temperature=temperature)
+        samples.append(frame_samples)
+        # Monitor progress
+        if t % print_progress_every == 0:
+            end = min(t + print_progress_every, num_samps)
+            step_dur = time.time() - start_time
+            print(f'Generated samples {t+1} - {end} of {num_samps} (time elapsed: {step_dur:.3f} seconds)')
+    samples = tf.concat(samples, axis=1)
+    samples = samples[:, model.big_frame_size:, :]
+    # Save sequences to disk
+    path = path.split('.wav')[0]
+    for i in range(model.batch_size):
+        seq = np.reshape(samples[i], (-1, 1))[model.big_frame_size :].tolist()
+        audio = dequantize(seq, q_type, q_levels)
+        file_name = '{}_{}'.format(path, str(i)) if model.batch_size > 1 else path
+        file_name = '{}.wav'.format(file_name)
+        write_wav(file_name, audio, sample_rate)
+        print('Generated sample output to {}'.format(file_name))
+    print('Done')
 
 
 def main():

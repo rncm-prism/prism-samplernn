@@ -4,6 +4,10 @@
 
 -----------
 
+### UPDATES (08/09/20)
+
+* Audio generation speed is now greatly improved (about 3-4 times faster).
+
 ### UPDATES (20/08/20)
 
 * Changes to the `chunk_audio.py` script:
