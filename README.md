@@ -168,7 +168,7 @@ The following table lists the hyper-parameters that may be passed at the command
 | `max_generate_per_epoch` | Maximum number of output files to generate at the end of each epoch.   | 1      | No        |
 | `sample_rate`            | Sample rate of the generated audio. | 22050         | No        |
 | `output_file_dur`        | Duration of generated audio files (in seconds). | 3         | No        |
-| `temperature`            | Sampling temperature for generated audio. | 0.95         | No        |
+| `temperature`            | Sampling temperature for generated audio. Multiple values may be passed, to match the number of sequences to be generated. If the number of values exceeds the value of `--num_seqs`, the list will be truncated to match it. If too few values are provided the last value will be repeated until the list length matches the number of requested sequences. | 0.75         | No        |
 | `seed`                   | Path to audio for seeding when generating audio. | `None`         | No        |
 | `seed_offset`            | Starting offset of the seed audio. | 0         | No        |
 | `val_pcnt`               | Percentage of data to reserve for validation. | 0.1         | No        |
@@ -228,7 +228,7 @@ The following is the full list of command line parameters for generate.py:
 | `dur`                      | Duration of generated audio.           | 3           | No       |
 | `num_seqs`                 | Number of audio sequences to generate.          | 1           | No        |
 | `sample_rate`              | Sample rate of the generated audio.          | 44100           | No        |
-| `temperature`              | Sampling temperature for generated audio. | 0.95         | No        |
+| `temperature`              | Sampling temperature for generated audio. Multiple values may be passed, to match the number of sequences to be generated. If the number of values exceeds the value of `--num_seqs`, the list will be truncated to match it. If too few values are provided the last value will be repeated until the list length matches the number of requested sequences.  | 0.75         | No        |
 | `seed`                     | Path to audio for seeding when generating audio. | `None`         | No        |
 | `seed_offset`              | Starting offset of the seed audio. | 0         | No        |
 

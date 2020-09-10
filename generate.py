@@ -39,7 +39,7 @@ def get_arguments():
                                                         help='Number of audio sequences to generate')
     parser.add_argument('--sample_rate',                type=check_positive, default=SAMPLE_RATE,
                                                         help='Sample rate of the generated audio')
-    parser.add_argument('--temperature',                type=float,          default=SAMPLING_TEMPERATURE,
+    parser.add_argument('--temperature',                type=float,          default=SAMPLING_TEMPERATURE, nargs='+',
                                                         help='Sampling temperature')
     parser.add_argument('--seed',                       type=str,            help='Path to audio for seeding')
     parser.add_argument('--seed_offset',                type=int,            default=SEED_OFFSET,
@@ -160,6 +160,17 @@ def load_seed_audio(path, offset, length):
 
 NUM_FRAMES_TO_PRINT = 4
 
+def get_temperature(temperature, batch_size):
+    if isinstance(temperature, list):
+        if len(temperature) < batch_size:
+            last_val = temperature[len(temperature)-1]
+            while len(temperature) < batch_size:
+                temperature = temperature + [last_val]
+        elif len(temperature) > batch_size:
+            temperature = temperature[:batch_size]
+        temperature = tf.reshape(temperature, (batch_size, 1))
+    return tf.cast(temperature, tf.float64)
+
 def generate(path, ckpt_path, config, num_seqs=NUM_SEQS, dur=OUTPUT_DUR, sample_rate=SAMPLE_RATE,
              temperature=SAMPLING_TEMPERATURE, seed=None, seed_offset=None):
     model = create_inference_model(ckpt_path, num_seqs, config)
@@ -167,6 +178,7 @@ def generate(path, ckpt_path, config, num_seqs=NUM_SEQS, dur=OUTPUT_DUR, sample_
     q_levels = model.q_levels
     q_zero = q_levels // 2
     num_samps = dur * sample_rate
+    temperature = get_temperature(temperature, num_seqs)
     # Precompute sample sequences, initialised to q_zero.
     samples = []
     init_samples = tf.fill((model.batch_size, model.big_frame_size, 1), q_zero)
