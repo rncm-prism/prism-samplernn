@@ -20,8 +20,8 @@ import numpy as np
 import librosa
 from natsort import natsorted
 
-from samplernn import (SampleRNN, find_files, quantize)
-from dataset import get_dataset
+from samplernn import SampleRNN
+from dataset import (get_dataset, get_dataset_filenames_split)
 from checkpoints import (TrainingStepCallback, ModelCheckpointCallback)
 
 
@@ -46,7 +46,6 @@ SAMPLING_TEMPERATURE = 0.75
 SEED_OFFSET = 0
 MAX_GENERATE_PER_EPOCH = 1
 VAL_PCNT = 0.1
-TEST_PCNT = 0.1
 
 
 def get_arguments():
@@ -120,8 +119,6 @@ def get_arguments():
                                                         help='Starting offset of the seed audio')
     parser.add_argument('--val_pcnt',                   type=float,          default=VAL_PCNT,
                                                         help='Percentage of data to reserve for validation')
-    parser.add_argument('--test_pcnt',                  type=float,          default=TEST_PCNT,
-                                                        help='Percentage of data to reserve for testing')
     return parser.parse_args()
 
 # Optimizer factory adapted from WaveNet
@@ -197,10 +194,8 @@ def get_initial_epoch(ckpt_path):
 def main():
     args = get_arguments()
 
-    files = find_files(args.data_dir)
-    if not files:
-        raise ValueError("No audio files found in '{}'.".format(args.data_dir))
-    dataset_size = len(files)
+    train_split, val_split = get_dataset_filenames_split(args.data_dir, args.val_pcnt)
+    train_dataset_size = len(train_split)
 
     # Create training session directories
     logdir = os.path.join(args.logdir_root, args.id)
@@ -239,24 +234,23 @@ def main():
     model.compile(optimizer=opt, loss=compute_loss, metrics=[train_accuracy])
 
     resume_from = (args.resume_from or latest_checkpoint) if args.resume==True else None
-
     initial_epoch = get_initial_epoch(resume_from)
-    dataset = get_dataset(args.data_dir, args.num_epochs-initial_epoch, args.batch_size, seq_len, overlap)
 
-    # Dataset iterator
-    def train_iter():
-        for batch in dataset:
-            num_samps = len(batch[0])
-            for i in range(overlap, num_samps, seq_len):
-                x = quantize(batch[:, i-overlap : i+seq_len], q_type, q_levels)
-                y = x[:, overlap : overlap+seq_len]
-                yield (x, y)
+    # Datasets (training and validation)
+    num_epochs = args.num_epochs-initial_epoch
+    val_batch_size = min(args.batch_size, len(val_split))
+
+    train_dataset = get_dataset(train_split, num_epochs, args.batch_size, seq_len, overlap,
+                                q_type=q_type, q_levels=q_levels)
+
+    val_dataset = get_dataset(val_split, num_epochs, val_batch_size, seq_len, overlap,
+                              drop_remainder=True, q_type=q_type, q_levels=q_levels)
 
     # This computes subseqs per batch...
-    samples0, _ = librosa.load(files[0], sr=None, mono=True)
+    samples0, _ = librosa.load(train_split[0], sr=None, mono=True)
     steps_per_batch = int(np.floor(len(samples0) / float(seq_len)))
 
-    steps_per_epoch = dataset_size // args.batch_size * steps_per_batch
+    steps_per_epoch = train_dataset_size // args.batch_size * steps_per_batch
 
     # Arguments passed to the generate function called
     # by the ModelCheckpointCallback...
@@ -315,12 +309,13 @@ def main():
     model(init_data)
     try:
         model.fit(
-            train_iter(),
+            train_dataset,
             epochs=args.num_epochs,
             initial_epoch=initial_epoch,
             steps_per_epoch=steps_per_epoch,
             shuffle=False,
             callbacks=callbacks,
+            validation_data=val_dataset,
             verbose=0,
         )
     except KeyboardInterrupt:
