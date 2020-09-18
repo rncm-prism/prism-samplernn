@@ -38,6 +38,9 @@ class TrainingStepCallback(tf.keras.callbacks.Callback):
         loss, acc = logs.get('loss'), logs.get('accuracy')
         step = batch + 1
         self._print_step_stats(step, loss, acc)
+
+    def on_test_batch_end(self, batch, logs):
+        self.on_batch_end(self, batch, logs):
     
     # Print the stats for one training step...
     def _print_step_stats(self, step, loss, acc):

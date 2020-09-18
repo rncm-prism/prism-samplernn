@@ -64,6 +64,19 @@ class SampleRNN(tf.keras.Model):
         self.compiled_metrics.update_state(target, prediction)
         return {metric.name: metric.result() for metric in self.metrics}
 
+    @tf.function
+    def test_step(self, data):
+        (x, y) = data
+        raw_output = self(x, training=True)
+        prediction = tf.reshape(raw_output, [-1, self.q_levels])
+        target = tf.reshape(y, [-1])
+        loss = self.compiled_loss(
+            target,
+            prediction,
+            regularization_losses=self.losses)
+        self.compiled_metrics.update_state(target, prediction)
+        return {metric.name: metric.result() for metric in self.metrics}
+
     # Sampling function
     def sample(self, samples, temperature):
         samples = tf.nn.log_softmax(samples)
