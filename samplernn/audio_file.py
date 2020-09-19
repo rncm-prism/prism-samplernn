@@ -2,11 +2,18 @@ import warnings
 import librosa
 import soundfile as sf
 import numpy as np
+import random
 
 # Contains some code adapted from WaveNet
 # https://github.com/ibab/tensorflow-wavenet/blob/master/wavenet/audio_reader.py
 
 # warnings.simplefilter("always")
+
+def randomize(list):
+    list_idx = [i for i in range(len(list))]
+    random.shuffle(list_idx)
+    for idx in range(len(list)):
+        yield list[list_idx[idx]]
 
 def load_audio(files, batch_size):
     '''Generator that yields audio waveforms from the directory.'''
@@ -16,7 +23,7 @@ def load_audio(files, batch_size):
         files_slice_idx = ( int(np.floor(len(files) / float(batch_size))) * batch_size )
         files = files[:files_slice_idx]
     print('Corpus length: {} files.'.format(len(files)))
-    for filename in files:
+    for filename in randomize(files):
         (audio, _) = librosa.load(filename, sr=None, mono=True)
         audio = audio.reshape(-1, 1)
         print("Loading corpus entry {}".format(filename))
