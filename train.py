@@ -195,7 +195,6 @@ def main():
     args = get_arguments()
 
     train_split, val_split = get_dataset_filenames_split(args.data_dir, args.val_pcnt)
-    train_dataset_size = len(train_split)
 
     # Create training session directories
     logdir = os.path.join(args.logdir_root, args.id)
@@ -250,7 +249,7 @@ def main():
     samples0, _ = librosa.load(train_split[0], sr=None, mono=True)
     steps_per_batch = int(np.floor(len(samples0) / float(seq_len)))
 
-    steps_per_epoch = train_dataset_size // args.batch_size * steps_per_batch
+    steps_per_epoch = len(train_split) // args.batch_size * steps_per_batch
 
     # Arguments passed to the generate function called
     # by the ModelCheckpointCallback...

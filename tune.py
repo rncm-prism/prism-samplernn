@@ -2,7 +2,9 @@ import tensorflow as tf
 import kerastuner as kt
 import json
 import random
+import numpy as np
 import argparse
+import librosa
 
 from samplernn import SampleRNN
 #from dataset import (get_dataset, get_dataset_filenames_split)
@@ -82,19 +84,29 @@ class SampleRNNTuner(kt.Tuner):
         overlap = model.big_frame_size
         q_type = 'mu-law'
         q_levels = 256
+        val_batch_size = min(batch_size, len(val_split))
+        test_batch_size = min(batch_size, len(test_split))
 
         # Train, Val and Test Datasets
         train_dataset = get_dataset(train_split, num_epochs, batch_size, seq_len, overlap,
                                     drop_remainder=True, q_type=q_type, q_levels=q_levels)
-        val_dataset = get_dataset(val_split, 1, batch_size, seq_len, overlap,
+        val_dataset = get_dataset(val_split, 1, val_batch_size, seq_len, overlap,
                                   drop_remainder=True, q_type=q_type, q_levels=q_levels)
-        test_dataset = get_dataset(test_split, 1, batch_size, seq_len, overlap,
+        test_dataset = get_dataset(test_split, 1, test_batch_size, seq_len, overlap,
                                    drop_remainder=True, q_type=q_type, q_levels=q_levels)
+
+        # Get subseqs per batch...
+        samples0, _ = librosa.load(train_split[0], sr=None, mono=True)
+        steps_per_batch = int(np.floor(len(samples0) / float(seq_len)))
+
+        # Get subseqs per epoch...
+        steps_per_epoch = len(train_split) // batch_size * steps_per_batch
 
         # Train...
         model.fit(
             train_dataset,
             epochs=num_epochs,
+            steps_per_epoch=steps_per_epoch,
             shuffle=False,
             validation_data=val_dataset 
         )
@@ -159,7 +171,7 @@ print(models)
 
 '''
 nohup python tune.py \
-  --data_dir ../path/to/dataset \
+  --data_dir ../datasets/dawn_of_midi \
   --num_epochs 2 \
   > tuner.log 2>&1 </dev/null &
 '''
