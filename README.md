@@ -66,8 +66,9 @@ The following Python packages are required:
 - Librosa
 - Natsort
 - Pydub
+- Keras Tuner
 
-Note that Pydub is only required for the audio chunking script.
+Note that Pydub is only required for the audio chunking script, and Keras Tuner for the model tuning script.
 
 ### CUDA
 
