@@ -45,9 +45,9 @@ def build_model(hp):
         emb_size=256,
         skip_conn=False
     )
-    optimizer = optimizer_factory['adam'](
-        learning_rate=hp.Choice('learning_rate', [1e-2, 1e-3, 1e-4], default=1e-3)
-    )
+    optimizer = tf.optimizers.Adam(
+        learning_rate=hp.Choice('learning_rate', [1e-2, 1e-3, 1e-4], default=1e-3),
+        epsilon=1e-4)
     model.compile(
         optimizer=optimizer,
         loss='sparse_categorical_crossentropy',
@@ -158,7 +158,8 @@ print(models)
 
 
 '''
-python tune.py \
-  --data_dir ./dawn_of_midi \
-  --num_epochs 2
+nohup python tune.py \
+  --data_dir ../path/to/dataset \
+  --num_epochs 2 \
+  > tuner.log 2>&1 </dev/null &
 '''
