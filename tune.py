@@ -2,12 +2,29 @@ import tensorflow as tf
 import kerastuner as kt
 import json
 import random
+import argparse
 
 from samplernn import SampleRNN
 #from dataset import (get_dataset, get_dataset_filenames_split)
 from dataset import (get_dataset, find_files)
 from train import optimizer_factory
 
+
+def get_arguments():
+    parser = argparse.ArgumentParser(description='PRiSM SampleRNN Model Tuner')
+    parser.add_argument('--data_dir',                   type=str,            required=True,
+                                                        help='Path to the directory containing the training data.')
+    parser.add_argument('--num_epochs',                 type=int, default=30,
+                                                        help='Number of training epochs')
+    parser.add_argument('--type',                       type=str,            default='bayesian', choices=['bayesian', 'random_search'],
+                                                        help='Type of tuning algorithm to use, either Bayesian Optimization or Random Search.')
+    parser.add_argument('--val_pcnt',                   type=float,          default=0.1,
+                                                        help='Percentage of data to reserve for validation.')
+    parser.add_argument('--test_pcnt',                  type=float,          default=0.1,
+                                                        help='Percentage of data to reserve for testing.')
+    return parser.parse_args()
+
+args = get_arguments()
 
 # Create and compile the model
 def build_model(hp):
@@ -29,8 +46,7 @@ def build_model(hp):
         skip_conn=False
     )
     optimizer = optimizer_factory['adam'](
-        learning_rate=hp.Choice('learning_rate', [1e-2, 1e-3, 1e-4], default=1e-3),
-        momentum=0.9,
+        learning_rate=hp.Choice('learning_rate', [1e-2, 1e-3, 1e-4], default=1e-3)
     )
     model.compile(
         optimizer=optimizer,
@@ -118,6 +134,31 @@ def create_bayesian_optimizer(objective='loss', max_trials=2, num_initial_points
             seed=seed),
         hypermodel=build_model)
 
-# Run it like -
-# tuner = create_bayesian_optimizer()
-# tuner.search('./path/to/dataset', 0.1, 0.1, num_epochs=5)
+tuner_factory = {
+    'bayesian' : create_bayesian_optimizer,
+    'random_search' : create_random_search_optimizer
+}
+
+tuner = tuner_factory[args.type]()
+
+tuner.search(
+    args.data_dir,
+    val_pcnt=args.val_pcnt,
+    test_pcnt=args.test_pcnt,
+    num_epochs=args.num_epochs
+)
+
+print('\n')
+print('Printing search summary...')
+tuner.results_summary()
+print('\n')
+print('Printing best model...')
+models = tuner.get_best_models()
+print(models)
+
+
+'''
+python tune.py \
+  --data_dir ./dawn_of_midi \
+  --num_epochs 2
+'''
