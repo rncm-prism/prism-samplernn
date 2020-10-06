@@ -9,8 +9,7 @@ from generate import generate
 
 ERASE_LINE = '\x1b[2K'
 
-# Custom training step callback (prints training stats and
-# manages audio generation)
+# Custom training step callback (prints training stats).
 class TrainingStepCallback(tf.keras.callbacks.Callback):
 
     def __init__(self, model, num_epochs, steps_per_epoch, steps_per_batch,
@@ -21,6 +20,7 @@ class TrainingStepCallback(tf.keras.callbacks.Callback):
         self.steps_per_batch = steps_per_batch
         self.resume_from = resume_from
         self.verbose = verbose
+        self.epoch_start_time = 0
         self.step_start_time = 0
 
     def on_train_begin(self, logs):
@@ -29,12 +29,19 @@ class TrainingStepCallback(tf.keras.callbacks.Callback):
 
     def on_epoch_begin(self, epoch, logs):
         self.epoch = epoch + 1
+        self.epoch_start_time = time.time()
 
-    def on_batch_begin(self, batch, logs):
+    def on_epoch_end(self, epoch, logs):
+        loss, acc = logs.get('loss'), logs.get('accuracy')
+        val_loss, val_acc = logs.get('val_loss'), logs.get('val_accuracy')
+        step = self.steps_per_epoch
+        self._print_step_stats(step, loss, acc, val_loss, val_acc)
+
+    def on_train_batch_begin(self, batch, logs):
         if batch % self.steps_per_batch == 0 : self.model.reset_states()
         self.step_start_time = time.time()
 
-    def on_batch_end(self, batch, logs):
+    def on_train_batch_end(self, batch, logs):
         loss, acc = logs.get('loss'), logs.get('accuracy')
         step = batch + 1
         self._print_step_stats(step, loss, acc)
@@ -43,14 +50,33 @@ class TrainingStepCallback(tf.keras.callbacks.Callback):
         self.on_batch_end(batch, logs)
     
     # Print the stats for one training step...
-    def _print_step_stats(self, step, loss, acc):
-        step_duration = time.time() - self.step_start_time
-        template = 'Epoch: {:d}/{:d}, Step: {:d}/{:d}, Loss: {:.3f}, Accuracy: {:.3f}, ({:.3f} sec/step)'
+    def _print_step_stats(self, step, loss, acc, val_loss=None, val_acc=None):
+        epoch_string = f'Epoch: {self.epoch}/{self.num_epochs}'
+        step_string = f'Total Steps: {self.steps_per_epoch}' if val_loss else f'Step: {step}/{self.steps_per_epoch}'
+        val_string = f'Val Loss: {val_loss:.3f}, Val Accuracy: {val_acc*100:.3f}, ' if val_loss else ""
+        dur_string = format_epoch_dur(time.time()-self.epoch_start_time) if val_loss \
+            else f'{time.time()-self.step_start_time:.3f} sec/step'
         end_char = '\r' if (self.verbose == False) and (step != self.steps_per_epoch) else '\n'
-        stats_string = template.format(self.epoch, self.num_epochs, step, self.steps_per_epoch, loss, acc * 100, step_duration)
+        stats_string = f'{epoch_string}, {step_string}, Loss: {loss:.3f}, Accuracy: {acc*100:.3f}, {val_string}({dur_string})'
         if self.verbose == False : stats_string = ERASE_LINE + stats_string
         print(stats_string, end=end_char)
 
+def format_epoch_dur(secs):
+    mins = int(secs // 60)
+    hrs = int(mins // 60)
+    sec_str = f'{int(secs) % 60}' if float(secs).is_integer() else f'{secs % 60:.3f}'
+    if hrs > 0:
+        return f'{hrs} hrs {mins % 60} min {sec_str} sec'
+    elif mins > 0:
+        return f'{mins} min {sec_str} sec'
+    else:
+        return f'{sec_str} seconds'
+
+def foo(seconds):
+    minutes = seconds // 60
+    hours = minutes // 60
+    print("%02d:%02d:%02d" % (hours, minutes % 60, seconds % 60))
+    print("%02d:%02d" % (minutes, seconds % 60))
 
 # Custom checkpoint callback. Manages generation phase and also
 # deletes old checkpoints.

@@ -280,12 +280,12 @@ def main():
             generate = args.generate,
             generation_args = generation_args,
             filepath = '{0}/model.ckpt-{{epoch}}'.format(rundir),
-            monitor = 'loss',
+            monitor = 'val_loss',
             save_weights_only = True,
             save_best_only = args.checkpoint_policy.lower()=='best',
             save_freq = args.checkpoint_every * steps_per_epoch),
         tf.keras.callbacks.EarlyStopping(
-            monitor = 'loss',
+            monitor = 'val_loss',
             patience = args.early_stopping_patience),
         tf.keras.callbacks.TensorBoard(
             log_dir = rundir, update_freq = 50)
