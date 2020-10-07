@@ -34,8 +34,7 @@ class TrainingStepCallback(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs):
         loss, acc = logs.get('loss'), logs.get('accuracy')
         val_loss, val_acc = logs.get('val_loss'), logs.get('val_accuracy')
-        step = self.steps_per_epoch
-        self._print_step_stats(step, loss, acc, val_loss, val_acc)
+        self._print_epoch_stats(loss, acc, val_loss, val_acc)
 
     def on_train_batch_begin(self, batch, logs):
         if batch % self.steps_per_batch == 0 : self.model.reset_states()
@@ -48,16 +47,20 @@ class TrainingStepCallback(tf.keras.callbacks.Callback):
 
     def on_test_batch_end(self, batch, logs):
         self.on_batch_end(batch, logs)
-    
+
     # Print the stats for one training step...
-    def _print_step_stats(self, step, loss, acc, val_loss=None, val_acc=None):
-        epoch_string = f'Epoch: {self.epoch}/{self.num_epochs}'
-        step_string = f'Total Steps: {self.steps_per_epoch}' if val_loss else f'Step: {step}/{self.steps_per_epoch}'
-        val_string = f'Val Loss: {val_loss:.3f}, Val Accuracy: {val_acc*100:.3f}, ' if val_loss else ""
-        dur_string = format_epoch_dur(time.time()-self.epoch_start_time) if val_loss \
-            else f'{time.time()-self.step_start_time:.3f} sec/step'
+    def _print_step_stats(self, step, loss, acc):
+        step_dur = time.time() - self.step_start_time
+        stats_string = f'Epoch: {self.epoch}/{self.num_epochs}, Step: {step}/{self.steps_per_epoch}, Loss: {loss:.3f}, Accuracy: {acc * 100:.3f}, ({step_dur:.3f} sec/step)'
         end_char = '\r' if (self.verbose == False) and (step != self.steps_per_epoch) else '\n'
-        stats_string = f'{epoch_string}, {step_string}, Loss: {loss:.3f}, Accuracy: {acc*100:.3f}, {val_string}({dur_string})'
+        if self.verbose == False : stats_string = ERASE_LINE + stats_string
+        print(stats_string, end=end_char)
+
+    # Print the stats for one epoch...
+    def _print_epoch_stats(self, loss, acc, val_loss, val_acc):
+        dur_string = format_epoch_dur(time.time() - self.step_start_time)
+        stats_string = f'Epoch: {self.epoch}/{self.num_epochs}, Total Steps: {self.steps_per_epoch}, Loss: {loss:.3f}, Accuracy: {acc * 100:.3f}, Val Loss: {val_loss:.3f}, Val Accuracy: {val_acc * 100:.3f} ({dur_string})'
+        end_char = '\r' if (self.verbose == False) and (step != self.steps_per_epoch) else '\n'
         if self.verbose == False : stats_string = ERASE_LINE + stats_string
         print(stats_string, end=end_char)
 
