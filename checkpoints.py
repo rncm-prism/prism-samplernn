@@ -72,12 +72,6 @@ def format_epoch_dur(secs):
     else:
         return f'{sec_str} seconds'
 
-def foo(seconds):
-    minutes = seconds // 60
-    hours = minutes // 60
-    print("%02d:%02d:%02d" % (hours, minutes % 60, seconds % 60))
-    print("%02d:%02d" % (minutes, seconds % 60))
-
 # Custom checkpoint callback. Manages generation phase and also
 # deletes old checkpoints.
 class ModelCheckpointCallback(tf.keras.callbacks.ModelCheckpoint):
