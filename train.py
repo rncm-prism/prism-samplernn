@@ -237,12 +237,12 @@ def main():
 
     # Datasets (training and validation)
     num_epochs = args.num_epochs-initial_epoch
-    val_batch_size = min(args.batch_size, len(val_split))
+    #val_batch_size = min(args.batch_size, len(val_split))
 
     train_dataset = get_dataset(train_split, num_epochs, args.batch_size, seq_len, overlap,
                                 drop_remainder=True, q_type=q_type, q_levels=q_levels)
 
-    val_dataset = get_dataset(val_split, 1, val_batch_size, seq_len, overlap,
+    val_dataset = get_dataset(val_split, 1, args.batch_size, seq_len, overlap,
                               drop_remainder=True, q_type=q_type, q_levels=q_levels)
 
     # This computes subseqs per batch...
