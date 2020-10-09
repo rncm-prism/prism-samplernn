@@ -58,7 +58,7 @@ class TrainingStepCallback(tf.keras.callbacks.Callback):
 
     # Print the stats for one epoch...
     def _print_epoch_stats(self, loss, acc, val_loss, val_acc):
-        dur_string = format_epoch_dur(time.time() - self.step_start_time)
+        dur_string = format_epoch_dur(time.time() - self.epoch_start_time)
         stats_string = f'Epoch: {self.epoch}/{self.num_epochs}, Total Steps: {self.steps_per_epoch}, Loss: {loss:.3f}, Accuracy: {acc * 100:.3f}, Val Loss: {val_loss:.3f}, Val Accuracy: {val_acc * 100:.3f} ({dur_string})'
         print(stats_string, end='\n')
 
