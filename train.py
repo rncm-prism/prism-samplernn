@@ -117,7 +117,7 @@ def get_arguments():
     parser.add_argument('--seed',                       type=str,            help='Path to audio for seeding')
     parser.add_argument('--seed_offset',                type=int,            default=SEED_OFFSET,
                                                         help='Starting offset of the seed audio')
-    parser.add_argument('--num_val_batches',            type=float,          default=NUM_VAL_BATCHES,
+    parser.add_argument('--num_val_batches',            type=check_positive, default=NUM_VAL_BATCHES,
                                                         help='Number of batches to reserve for validation')
     return parser.parse_args()
 
