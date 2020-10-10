@@ -14,24 +14,12 @@ def find_files(directory, pattern='*.wav'):
             files.append(os.path.join(root, filename))
     return files
 
-'''
-def get_dataset_filenames_split(data_dir, val_pcnt, test_pcnt):
+def get_dataset_filenames_split(data_dir, val_size):
     files = find_files(data_dir)
     if not files:
         raise ValueError("No audio files found in '{}'.".format(data_dir))
     random.shuffle(files)
-    num_files = len(files)
-    test_start = int( (1 - test_pcnt) * num_files )
-    val_start = int( (1 - test_pcnt - val_pcnt) * num_files )
-    return files[: val_start], files[val_start : test_start], files[test_start :]
-'''
-
-def get_dataset_filenames_split(data_dir, val_pcnt):
-    files = find_files(data_dir)
-    if not files:
-        raise ValueError("No audio files found in '{}'.".format(data_dir))
-    random.shuffle(files)
-    val_start = int( (1 - val_pcnt) * len(files) )
+    val_start = len(files) - val_size
     return files[: val_start], files[val_start :]
 
 def pad_batch(batch, batch_size, seq_len, overlap):

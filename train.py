@@ -45,7 +45,7 @@ SAMPLE_RATE = 22050 # Sample rate of generated audio
 SAMPLING_TEMPERATURE = 0.75
 SEED_OFFSET = 0
 MAX_GENERATE_PER_EPOCH = 1
-VAL_PCNT = 0.1
+NUM_VAL_BATCHES = 1
 
 
 def get_arguments():
@@ -117,8 +117,8 @@ def get_arguments():
     parser.add_argument('--seed',                       type=str,            help='Path to audio for seeding')
     parser.add_argument('--seed_offset',                type=int,            default=SEED_OFFSET,
                                                         help='Starting offset of the seed audio')
-    parser.add_argument('--val_pcnt',                   type=float,          default=VAL_PCNT,
-                                                        help='Percentage of data to reserve for validation')
+    parser.add_argument('--num_val_batches',            type=float,          default=NUM_VAL_BATCHES,
+                                                        help='Number of batches to reserve for validation')
     return parser.parse_args()
 
 # Optimizer factory adapted from WaveNet
@@ -194,7 +194,8 @@ def get_initial_epoch(ckpt_path):
 def main():
     args = get_arguments()
 
-    train_split, val_split = get_dataset_filenames_split(args.data_dir, args.val_pcnt)
+    train_split, val_split = get_dataset_filenames_split(
+        args.data_dir, args.num_val_batches * args.batch_size)
 
     # Create training session directories
     logdir = os.path.join(args.logdir_root, args.id)
@@ -294,11 +295,11 @@ def main():
     reduce_lr_after = args.reduce_learning_rate_after
 
     if reduce_lr_after and reduce_lr_after > 0:
-        def scheduler(epoch, leaning_rate):
+        def scheduler(epoch, learning_rate):
             if epoch < reduce_lr_after:
-                return leaning_rate
+                return learning_rate
             else:
-                return leaning_rate * tf.math.exp(-0.1)
+                return learning_rate * tf.math.exp(-0.1)
         callbacks.append(
             tf.keras.callbacks.LearningRateScheduler(scheduler)
         )
