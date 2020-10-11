@@ -162,7 +162,8 @@ def create_model(batch_size, config):
         rnn_type=config.get('rnn_type'),
         num_rnn_layers=config.get('num_rnn_layers'),
         emb_size=config.get('emb_size'),
-        skip_conn=config.get('skip_conn')
+        skip_conn=config.get('skip_conn'),
+        rnn_dropout=config.get('rnn_dropout')
     )
 
 def get_latest_checkpoint(logdir):

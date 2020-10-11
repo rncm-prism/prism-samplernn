@@ -4,7 +4,8 @@ from .nn import RNN
 
 class FrameRNN(tf.keras.layers.Layer):
 
-    def __init__(self, rnn_type, frame_size, num_lower_tier_frames, num_layers, dim, q_levels, skip_conn):
+    def __init__(self, rnn_type, frame_size, num_lower_tier_frames,
+                 num_layers, dim, q_levels, skip_conn, dropout):
         super(FrameRNN, self).__init__()
         self.frame_size = frame_size
         self.num_lower_tier_frames = num_lower_tier_frames
@@ -13,7 +14,7 @@ class FrameRNN(tf.keras.layers.Layer):
         self.q_levels = q_levels
         self.skip_conn = skip_conn
         self.inputs = tf.keras.layers.Dense(self.dim)
-        self.rnn = RNN(rnn_type, self.dim, self.num_layers, self.skip_conn)
+        self.rnn = RNN(rnn_type, self.dim, self.num_layers, self.skip_conn, dropout=(dropout or 0.0))
 
     def build(self, input_shape):
         self.upsample = tf.Variable(

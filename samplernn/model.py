@@ -8,8 +8,8 @@ from .utils import unsqueeze
 
 class SampleRNN(tf.keras.Model):
 
-    def __init__(self, batch_size, frame_sizes, q_levels, q_type,
-                 dim, rnn_type, num_rnn_layers, seq_len, emb_size, skip_conn):
+    def __init__(self, batch_size, frame_sizes, q_levels, q_type, dim, rnn_type,
+                 num_rnn_layers, seq_len, emb_size, skip_conn, rnn_dropout):
         super(SampleRNN, self).__init__()
         self.batch_size = batch_size
         self.big_frame_size = frame_sizes[1]
@@ -30,7 +30,8 @@ class SampleRNN(tf.keras.Model):
             num_layers = self.num_rnn_layers,
             dim = self.dim,
             q_levels = self.q_levels,
-            skip_conn = self.skip_conn
+            skip_conn = self.skip_conn,
+            dropout=rnn_dropout
         )
 
         self.frame_rnn = FrameRNN(
@@ -40,7 +41,8 @@ class SampleRNN(tf.keras.Model):
             num_layers = self.num_rnn_layers,
             dim = self.dim,
             q_levels = self.q_levels,
-            skip_conn = self.skip_conn
+            skip_conn = self.skip_conn,
+            dropout=rnn_dropout
         )
 
         self.sample_mlp = SampleMLP(

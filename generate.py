@@ -144,7 +144,9 @@ def create_inference_model(ckpt_path, num_seqs, config):
         rnn_type = config.get('rnn_type'),
         num_rnn_layers = config['num_rnn_layers'],
         emb_size = config['emb_size'],
-        skip_conn = config.get('skip_conn')
+        skip_conn = config.get('skip_conn'),
+        rnn_dropout=config.get('rnn_dropout')
+
     )
     num_samps = config['seq_len'] + model.big_frame_size
     init_data = np.zeros((model.batch_size, num_samps, 1), dtype='int32')
