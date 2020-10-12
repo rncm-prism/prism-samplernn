@@ -39,6 +39,7 @@ CHECKPOINT_EVERY = 1
 CHECKPOINT_POLICY = 'Always' # 'Always' or 'Best'
 MAX_CHECKPOINTS = 5
 RESUME = True
+TRACKED_METRIC = 'val_loss'
 EARLY_STOPPING_PATIENCE = 3
 GENERATE = True
 SAMPLE_RATE = 22050 # Sample rate of generated audio
@@ -97,6 +98,8 @@ def get_arguments():
     parser.add_argument('--reduce_learning_rate_after', type=check_positive, help='Exponentially reduce learning rate after this many epochs')
     parser.add_argument('--momentum',                   type=float,          default=MOMENTUM,
                                                         help='Optimizer momentum')
+    parser.add_argument('--monitor',                    type=str,            default=TRACKED_METRIC, choices=['loss', 'accuracy', 'val_loss', 'val_accuracy'],
+                                                        help='Metric to track during training')
     parser.add_argument('--checkpoint_every',           type=check_positive, default=CHECKPOINT_EVERY,
                                                         help='Interval (in epochs) at which to generate a checkpoint file')
     parser.add_argument('--checkpoint_policy',          type=str, default=CHECKPOINT_POLICY, choices=['Always', 'Best'],
@@ -282,12 +285,12 @@ def main():
             generate = args.generate,
             generation_args = generation_args,
             filepath = '{0}/model.ckpt-{{epoch}}'.format(rundir),
-            monitor = 'val_loss',
+            monitor = args.monitor,
             save_weights_only = True,
             save_best_only = args.checkpoint_policy.lower()=='best',
             save_freq = args.checkpoint_every * steps_per_epoch),
         tf.keras.callbacks.EarlyStopping(
-            monitor = 'val_loss',
+            monitor = args.monitor,
             patience = args.early_stopping_patience),
         tf.keras.callbacks.TensorBoard(
             log_dir = rundir, update_freq = 50)

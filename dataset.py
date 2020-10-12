@@ -18,7 +18,7 @@ def get_dataset_filenames_split(data_dir, val_size):
     files = find_files(data_dir)
     if not files:
         raise ValueError("No audio files found in '{}'.".format(data_dir))
-    random.shuffle(files)
+    #random.shuffle(files)
     val_start = len(files) - val_size
     return files[: val_start], files[val_start :]
 
