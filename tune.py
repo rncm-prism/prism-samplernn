@@ -30,10 +30,10 @@ def get_arguments():
                                                         help='Number of samples processed in one time-step in the middle tier RNN')
     parser.add_argument('--batch_size',                 type=int,   required=True, nargs='+', help='Size of the mini-batch')
     parser.add_argument('--seq_len',                    type=int,   required=True, nargs='+', help='RNN sequence length')
-    parser.add_argument('--dim',                        type=int,   default=[1024, 2048], help='RNN output space dimensionality')
-    parser.add_argument('--num_rnn_layers',             type=int,   default=[1, 2, 4, 8], help='Number of RNN layers')
-    parser.add_argument('--rnn_dropout',                type=float, default=[0.2, 0.4, 0.6], help='Size of the RNN dropout')
-    parser.add_argument('--learning_rate',              type=float, default=[1e-2, 1e-3, 1e-4], help='Learning rate of training')
+    parser.add_argument('--dim',                        type=int,   default=[1024, 2048], nargs='+', help='RNN output space dimensionality')
+    parser.add_argument('--num_rnn_layers',             type=int,   default=[1, 2, 4, 8], nargs='+', help='Number of RNN layers')
+    parser.add_argument('--rnn_dropout',                type=float, default=[0.2, 0.4, 0.6], nargs='+', help='Size of the RNN dropout')
+    parser.add_argument('--learning_rate',              type=float, default=[1e-2, 1e-3, 1e-4], nargs='+', help='Learning rate of training')
     return parser.parse_args()
 
 args = get_arguments()
@@ -186,11 +186,12 @@ print(models)
 # Run it like:
 '''
 nohup python tune.py \
-  --data_dir ../datasets/dawn_of_midi \
+  --data_dir path/to/dataset \
   --num_epochs 2 \
   --big_frame_size 32 64 \
   --frame_size 4 2 \
   --batch_size 16 32 64 \
   --seq_len 512 1024 2048 \
+  --num_rnn_layers 2 4 \
   > tuner.log 2>&1 </dev/null &
 '''
