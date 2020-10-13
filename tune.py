@@ -23,6 +23,8 @@ def get_arguments():
                                                         help='Type of tuning algorithm to use, either Bayesian Optimization or Random Search.')
     parser.add_argument('--objective',                  type=str,   default='val_loss', choices=['loss', 'accuracy', 'val_loss', 'val_accuracy'],
                                                         help='Metric to set as the objective for tuning')
+    parser.add_argument('--early_stopping_patience',    type=int, default=3,
+                                                        help='Number of epochs with no improvement after which training will be stopped.')
     parser.add_argument('--num_val_batches',            type=int,   default=1, help='Number of batches to reserve for validation')
     parser.add_argument('--big_frame_size',             type=int,   required=True, nargs='+',
                                                         help='Number of samples processed in one time-step in the top tier RNN')
@@ -170,10 +172,18 @@ tuner_factory = {
 
 tuner = tuner_factory[args.type]()
 
+callbacks = [
+    tf.keras.callbacks.EarlyStopping(
+        monitor = args.objective,
+        patience = args.early_stopping_patience)
+]
+
 tuner.search(
     data_dir=args.data_dir,
     num_val_batches=args.num_val_batches,
-    num_epochs=args.num_epochs)
+    num_epochs=args.num_epochs,
+    callbacks=callbacks,
+)
 
 print('\n')
 print('Printing search summary...')
