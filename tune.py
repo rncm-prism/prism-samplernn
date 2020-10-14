@@ -83,7 +83,7 @@ def get_dataset_filenames_split(data_dir, val_size, test_size):
 # Tuner subclass.
 class SampleRNNTuner(kt.Tuner):
 
-    def run_trial(self, trial, data_dir, num_val_batches, *args, **kwargs):
+    def run_trial(self, trial, data_dir, num_val_batches, objective, *args, **kwargs):
         hp = trial.hyperparameters
         model = self.hypermodel.build(trial.hyperparameters)
 
@@ -131,7 +131,7 @@ class SampleRNNTuner(kt.Tuner):
                 best_value = np.max(epoch_values)
             metrics[metric] = best_value
 
-        oracle_metrics_dict = {args.objective: metrics[args.objective]}
+        oracle_metrics_dict = {objective: metrics[objective]}
 
         # If we completely override run_trial we need to call this at the end.
         # See https://keras-team.github.io/keras-tuner/documentation/tuners/#run_trial-method_1 
@@ -181,6 +181,7 @@ callbacks = [
 tuner.search(
     data_dir=args.data_dir,
     num_val_batches=args.num_val_batches,
+    objective=args.objective,
     num_epochs=args.num_epochs,
     callbacks=callbacks,
 )
