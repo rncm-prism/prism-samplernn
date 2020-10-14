@@ -136,7 +136,7 @@ class SampleRNNTuner(kt.Tuner):
         # If we completely override run_trial we need to call this at the end.
         # See https://keras-team.github.io/keras-tuner/documentation/tuners/#run_trial-method_1 
         self.oracle.update_trial(trial.trial_id, oracle_metrics_dict)
-        self.oracle.save_model(trial.trial_id, model)
+        self.save_model(trial.trial_id, model)
 
 
 # Random Search.
