@@ -189,10 +189,6 @@ tuner.search(
 print('\n')
 print('Printing search summary...')
 tuner.results_summary()
-print('\n')
-print('Printing best model...')
-models = tuner.get_best_models()
-print(models)
 
 # Run it like:
 '''
