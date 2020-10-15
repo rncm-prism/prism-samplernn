@@ -23,7 +23,8 @@ def get_arguments():
                                                         help='Type of tuning algorithm to use, either Bayesian Optimization or Random Search.')
     parser.add_argument('--objective',                  type=str,   default='val_loss', choices=['loss', 'accuracy', 'val_loss', 'val_accuracy'],
                                                         help='Metric to set as the objective for tuning')
-    parser.add_argument('--early_stopping_patience',    type=int, default=3,
+    parser.add_argument('--max_trials',                 type=int,   default=10, help='Maximum nuber of trials to run')
+    parser.add_argument('--early_stopping_patience',    type=int,   default=3,
                                                         help='Number of epochs with no improvement after which training will be stopped.')
     parser.add_argument('--num_val_batches',            type=int,   default=1, help='Number of batches to reserve for validation')
     parser.add_argument('--big_frame_size',             type=int,   required=True, nargs='+',
@@ -140,7 +141,7 @@ class SampleRNNTuner(kt.Tuner):
 
 
 # Random Search.
-def create_random_search_optimizer(objective=args.objective, max_trials=2, seed=None):
+def create_random_search_optimizer(objective=args.objective, max_trials=args.max_trials, seed=None):
     return SampleRNNTuner(
         oracle=kt.oracles.RandomSearch(
             objective=objective,
@@ -151,8 +152,8 @@ def create_random_search_optimizer(objective=args.objective, max_trials=2, seed=
         project_name=args.id)
 
 # Bayesian Optimization.
-def create_bayesian_optimizer(objective=args.objective, max_trials=2, num_initial_points=None,
-                              alpha=0.0001, beta=2.6, seed=None):
+def create_bayesian_optimizer(objective=args.objective, max_trials=args.max_trials,
+                              num_initial_points=None, alpha=0.0001, beta=2.6, seed=None):
     return SampleRNNTuner(
         oracle=kt.oracles.BayesianOptimization(
             objective=objective,
