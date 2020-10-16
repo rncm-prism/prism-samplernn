@@ -104,7 +104,7 @@ class SampleRNNTuner(kt.Tuner):
         # Train, Val and Test Datasets
         train_dataset = get_dataset(train_split, num_epochs, batch_size, seq_len, overlap,
                                     drop_remainder=True, q_type=q_type, q_levels=q_levels)
-        val_dataset = get_dataset(val_split, 1, batch_size, seq_len, overlap,
+        val_dataset = get_dataset(val_split, 1, batch_size, seq_len, overlap, shuffle=False,
                                   drop_remainder=True, q_type=q_type, q_levels=q_levels)
 
         # Get subseqs per batch...

@@ -15,7 +15,13 @@ def randomize(list):
     for idx in range(len(list)):
         yield list[list_idx[idx]]
 
-def load_audio(files, batch_size):
+def yield_from_list(list, shuffle=True):
+    list_idx = [i for i in range(len(list))]
+    if shuffle==True : random.shuffle(list_idx)
+    for idx in range(len(list)):
+        yield list[list_idx[idx]]
+
+def load_audio(files, batch_size, shuffle=True):
     '''Generator that yields audio waveforms from the directory.'''
     assert batch_size <= len(files), 'Batch size exceeds the corpus length'
     if not (len(files) % batch_size) == 0:
@@ -23,7 +29,8 @@ def load_audio(files, batch_size):
         files_slice_idx = ( int(np.floor(len(files) / float(batch_size))) * batch_size )
         files = files[:files_slice_idx]
     print('Corpus length: {} files.'.format(len(files)))
-    for filename in randomize(files):
+    #for filename in randomize(files):
+    for filename in yield_from_list(files, shuffle=shuffle):
         (audio, _) = librosa.load(filename, sr=None, mono=True)
         audio = audio.reshape(-1, 1)
         print("Loading corpus entry {}".format(filename))

@@ -247,7 +247,7 @@ def main():
     train_dataset = get_dataset(train_split, num_epochs, args.batch_size, seq_len, overlap,
                                 drop_remainder=True, q_type=q_type, q_levels=q_levels)
 
-    val_dataset = get_dataset(val_split, 1, args.batch_size, seq_len, overlap,
+    val_dataset = get_dataset(val_split, 1, args.batch_size, seq_len, overlap, shuffle=False,
                               drop_remainder=True, q_type=q_type, q_levels=q_levels)
 
     # This computes subseqs per batch...

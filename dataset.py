@@ -18,7 +18,7 @@ def get_dataset_filenames_split(data_dir, val_size):
     files = find_files(data_dir)
     if not files:
         raise ValueError("No audio files found in '{}'.".format(data_dir))
-    #random.shuffle(files)
+    random.shuffle(files)
     val_start = len(files) - val_size
     return files[: val_start], files[val_start :]
 
@@ -35,9 +35,9 @@ def get_subseq(dataset, batch_size, seq_len, overlap, q_type, q_levels):
             y = x[:, overlap : overlap+seq_len]
             yield (x, y)
 
-def get_dataset(files, num_epochs, batch_size, seq_len, overlap, drop_remainder=False, q_type='mu-law', q_levels=256):
+def get_dataset(files, num_epochs, batch_size, seq_len, overlap, drop_remainder=False, shuffle=True, q_type='mu-law', q_levels=256):
     dataset = tf.data.Dataset.from_generator(
-        lambda: load_audio(files, batch_size),
+        lambda: load_audio(files, batch_size, shuffle=shuffle),
         output_types=tf.float32,
         output_shapes=((None, 1))
     )
