@@ -36,7 +36,9 @@ def get_arguments():
     parser.add_argument('--dim',                        type=int,   default=[1024, 2048], nargs='+', help='RNN output space dimensionality')
     parser.add_argument('--num_rnn_layers',             type=int,   default=[1, 2, 4, 8], nargs='+', help='Number of RNN layers')
     parser.add_argument('--rnn_dropout',                type=float, default=[0.2, 0.4, 0.6], nargs='+', help='Size of the RNN dropout')
+    parser.add_argument('--optimizer',                  type=str,   default='adam', choices=optimizer_factory.keys(), help='Type of training optimizer to use')
     parser.add_argument('--learning_rate',              type=float, default=[1e-2, 1e-3, 1e-4], nargs='+', help='Learning rate of training')
+    parser.add_argument('--momentum',                   type=float, default=[0.1, 0.5, 0.9], nargs='+', help='Optimizer momentum')
     return parser.parse_args()
 
 args = get_arguments()
@@ -61,9 +63,10 @@ def build_model(hp):
         skip_conn=False,
         rnn_dropout=hp.Choice('rnn_dropout', args.rnn_dropout)
     )
-    optimizer = tf.optimizers.Adam(
+    optimizer = optimizer_factory[args.optimizer](
         learning_rate=hp.Choice('learning_rate', args.learning_rate),
-        epsilon=1e-4)
+        momentum=hp.Choice('momentum', args.learning_rate)
+    )
     compute_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='accuracy')
     model.compile(optimizer=optimizer, loss=compute_loss, metrics=[train_accuracy])
