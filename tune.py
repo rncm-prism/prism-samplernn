@@ -34,6 +34,7 @@ def get_arguments():
     parser.add_argument('--batch_size',                 type=int,   required=True, nargs='+', help='Size of the mini-batch')
     parser.add_argument('--seq_len',                    type=int,   required=True, nargs='+', help='RNN sequence length')
     parser.add_argument('--dim',                        type=int,   default=[1024, 2048], nargs='+', help='RNN output space dimensionality')
+    parser.add_argument('--rnn_type',                   type=str,   default=['gru', 'lstm'], nargs='+', help='RNN type (GRU or LSTM)')
     parser.add_argument('--num_rnn_layers',             type=int,   default=[1, 2, 4, 8], nargs='+', help='Number of RNN layers')
     parser.add_argument('--rnn_dropout',                type=float, default=[0.2, 0.4, 0.6], nargs='+', help='Size of the RNN dropout')
     parser.add_argument('--optimizer',                  type=str,   default='adam', choices=optimizer_factory.keys(), help='Type of training optimizer to use')
@@ -57,7 +58,7 @@ def build_model(hp):
         q_type='mu-law',
         q_levels=256,
         dim=hp.Choice('dim', args.dim),
-        rnn_type='gru',
+        rnn_type=hp.Choice('rnn_type', args.rnn_type),
         num_rnn_layers=hp.Choice('num_rnn_layers', args.num_rnn_layers),
         emb_size=256,
         skip_conn=False,
@@ -65,7 +66,7 @@ def build_model(hp):
     )
     optimizer = optimizer_factory[args.optimizer](
         learning_rate=hp.Choice('learning_rate', args.learning_rate),
-        momentum=hp.Choice('momentum', args.learning_rate)
+        momentum=hp.Choice('momentum', args.momentum)
     )
     compute_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='accuracy')
