@@ -29,9 +29,10 @@ def pad_batch(batch, batch_size, seq_len, overlap):
 
 def get_subseq(dataset, batch_size, seq_len, overlap, q_type, q_levels):
     for batch in dataset:
+        batch = quantize(batch, q_type, q_levels)
         num_samps = len(batch[0])
         for i in range(overlap, num_samps, seq_len):
-            x = quantize(batch[:, i-overlap : i+seq_len], q_type, q_levels) # need to import quantize
+            x = batch[:, i-overlap : i+seq_len]
             y = x[:, overlap : overlap+seq_len]
             yield (x, y)
 
