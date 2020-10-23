@@ -14,8 +14,9 @@ class SampleMLP(tf.keras.layers.Layer):
         self.inputs = tf.keras.layers.Conv1D(
             filters=self.dim, kernel_size=frame_size, use_bias=False
         )
-        self.hidden = tf.keras.layers.Dense(self.dim, activation='relu')
-        self.outputs = tf.keras.layers.Dense(self.q_levels, activation='relu')
+        self.hidden1 = tf.keras.layers.Dense(self.dim, activation='relu')
+        self.hidden2 = tf.keras.layers.Dense(self.dim, activation='relu')
+        self.outputs = tf.keras.layers.Dense(self.q_levels)
 
     def call(self, inputs, conditioning_frames):
         batch_size = tf.shape(inputs)[0]
@@ -23,5 +24,6 @@ class SampleMLP(tf.keras.layers.Layer):
         inputs = self.embedding(tf.reshape(inputs, [-1]))
         inputs = self.inputs(tf.reshape(inputs, [batch_size, -1, self.q_levels]))
 
-        hidden = self.hidden(inputs + conditioning_frames)
+        hidden = self.hidden1(inputs + conditioning_frames)
+        hidden = self.hidden2(hidden)
         return self.outputs(hidden)
