@@ -37,16 +37,13 @@ class TrainingStepCallback(tf.keras.callbacks.Callback):
         self._print_epoch_stats(loss, acc, val_loss, val_acc)
 
     def on_train_batch_begin(self, batch, logs):
-        if batch % self.steps_per_batch == 0 : self.model.reset_states()
+        if batch % self.steps_per_batch == 0 : self.model.reset_rnn_states()
         self.step_start_time = time.time()
 
     def on_train_batch_end(self, batch, logs):
         loss, acc = logs.get('loss'), logs.get('accuracy')
         step = batch + 1
         self._print_step_stats(step, loss, acc)
-
-    def on_test_batch_end(self, batch, logs):
-        self.on_batch_end(batch, logs)
 
     # Print the stats for one training step...
     def _print_step_stats(self, step, loss, acc):
@@ -60,6 +57,7 @@ class TrainingStepCallback(tf.keras.callbacks.Callback):
     def _print_epoch_stats(self, loss, acc, val_loss, val_acc):
         dur_string = format_epoch_dur(time.time() - self.epoch_start_time)
         stats_string = f'Epoch: {self.epoch}/{self.num_epochs}, Total Steps: {self.steps_per_epoch}, Loss: {loss:.3f}, Accuracy: {acc * 100:.3f}, Val Loss: {val_loss:.3f}, Val Accuracy: {val_acc * 100:.3f} ({dur_string})'
+        #stats_string = f'Epoch: {self.epoch}/{self.num_epochs}, Loss: {loss:.3f}, Accuracy: {acc * 100:.3f}, Val Loss: {val_loss:.3f}, Val Accuracy: {val_acc * 100:.3f} ({self.steps_per_epoch} steps in {dur_string})'
         print(stats_string, end='\n')
 
 def format_epoch_dur(secs):

@@ -133,11 +133,17 @@ python train.py \
 
 Checkpoints storing the current state of the model are periodically saved to disk during training, with the default behaviour being to save a checkpoint at the end of each epoch. This interval may be modified through the `--checkpoint_every` parameter.  By default every checkpoint will be saved, but this behaviour can be controlled using the `--checkpoint_policy` parameter. Pass `Best` to save only the latest best checkpoint according to the training metrics (loss and accuracy). An audio file is also generated each time a checkpoint is saved, which may be used to assess the progress of the training (generation may be switched off by setting `--generate` to `False`).
 
+Before training begins a certain portion of the input dataset is reserved for _validation_, which occurs at the end of each epoch. This is a stage during which the network is exposed to (but not trained on) a certain number of batches, usually small in number, a value determined by the `--num_val_batches` parameter (defaults to 1). The purpose of validation is to test whether the network can generalize to inputs that it has not seen before. How well the network does when processing this unseen data can provide insight into whether the network is [overfitting or underfitting](https://www.tensorflow.org/tutorials/keras/overfit_and_underfit) (see the [Statistics](https://github.com/rncm-prism/prism-samplernn#statistics) section below for how validation statistics are reported). Note that since at least one batch is required for the validation set it is important that enough batches are made available to the network. A typical validation set size would be about 10-15% of the total data available, so if our complete dataset is 520 chunks in length, and our batch size is 64, 1 batch will be sufficient for validation (since 64 is roughly 10-15% of 520).
+
 ### Statistics
 
 Statistics providing information on the progress of traing are printed to the terminal prompt at each step. For example:
 
 `Epoch: 1/2, Step: 125/1500, Loss: 4.182, Accuracy: 13.418, (0.0357 sec/step)`
+
+At the end of each epoch the final loss and accuracy for the epoch are displayed, along with the validation loss and validation accuracy, and the epoch's total duration:
+
+`Epoch: 1/2, Loss: 2.342, Accuracy: 18.928, Val Loss: 2.194, Val Accuracy: 19.273 (1500 steps in 1 min 11.235 sec)`
 
 The `--verbose` command line argument determines how these statistics are printed - if `True` (the default) each step is printed to a new line, if `False` a new line is taken only at each epoch, with each printed step within an epoch being overwritten.
 

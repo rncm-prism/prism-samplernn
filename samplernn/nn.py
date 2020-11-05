@@ -60,6 +60,10 @@ class RNN(tf.keras.layers.Layer):
                     self.dim, kernel_initializer='he_uniform', use_bias=(i==0)))
         super(RNN, self).build(input_shape)
 
+    def reset_states(self):
+        for name in self._layer_names:
+            self.__getattribute__(name).reset_states()
+
     def run_rnn(self, name, inputs):
         rnn = self.__getattribute__(name)
         return rnn(inputs)

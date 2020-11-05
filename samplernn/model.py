@@ -114,6 +114,10 @@ class SampleRNN(tf.keras.Model):
             samples = tf.concat([samples, generated], axis=1)
         return samples[:, num_samps:]
 
+    def reset_rnn_states(self):
+        self.big_frame_rnn.reset_states()
+        self.frame_rnn.reset_states()
+
     def call(self, inputs, training=True, temperature=1.0):
         if training==True:
             # UPPER TIER

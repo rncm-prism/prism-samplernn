@@ -23,6 +23,9 @@ class FrameRNN(tf.keras.layers.Layer):
             name="upsample",
         )
 
+    def reset_states(self):
+        self.rnn.reset_states()
+
     def call(self, inputs, conditioning_frames=None):
         # When running in tf.function mode this type of assignment caused an error
         # (batch_size, _, _) = tf.shape(inputs)

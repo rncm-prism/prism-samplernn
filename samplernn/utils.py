@@ -28,20 +28,14 @@ def mu_law_decode(output, quantization_channels):
         magnitude = (1 / mu) * ((1 + mu)**abs(signal) - 1)
         return tf.sign(signal) * magnitude
 
+# See https://github.com/deepsound-project/samplernn-pytorch/issues/21
+# for reasoning behind this implementation (no min-max normalization).
 def linear_quantize(samples, q_levels):
     '''Floats in (-1, 1) to ints in [0, q_levels-1]'''
     epsilon = 1e-5
     out = samples.numpy().copy()
-    out -= out.min(axis=1)[:, None]
-    out *= ((q_levels - epsilon) / out.max(axis=1))[:, None]
-    out += epsilon / 2
-    return out.astype('int32')
-
-def linear_quantize2(samples, q_levels):
-    epsilon = 1e-2
-    out = samples.numpy().copy()
-    out -= out.min(axis=1)[:, None]
-    out /= out.max(axis=1)[:, None]
+    out += 1
+    out /= 2.0
     out *= q_levels - epsilon
     out += epsilon / 2
     return out.astype('int32')
