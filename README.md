@@ -1,37 +1,6 @@
 # PRiSM SampleRNN  
 
 [PRiSM](https://www.rncm.ac.uk/research/research-centres-rncm/prism/) implementation of [SampleRNN: An Unconditional End-to-End Neural Audio Generation Model](https://arxiv.org/abs/1612.07837), for [TensorFlow 2](https://www.tensorflow.org/overview).
-
------------
-
-### UPDATES (03/12/20)
-
-* Implemented validation step.
-* Added tuner script for hyperparameter optimization.
-* Removed ReLU activation from the final MLP layer.
-* Fixed linear quantization bug.
-
-### UPDATES (08/09/20)
-
-* Audio generation speed is now greatly improved (about 3-4 times faster).
-
-### UPDATES (20/08/20)
-
-* Changes to the `chunk_audio.py` script:
-   - The `--input_file` and `--output_dir` arguments were previously positional, now they are named arguments.
-   - It is no longer necessary to create the output directory beforehand, it will be created it if it does not exist (also no trailing slash is required when supplying the path to the directory).
-   - The script output now reports when a chunk is silent and will be omitted.
-   - When complete the script now reports the number of chunks processed and number of chunks omitted (for silence).
-* A new `--checkpoint_policy` parameter allows to set the policy for saving checkpoints - whether to only save the checkpoint when there has been an improvement in the training metrics (`Best`), or whether to always save them, regardless of changes to the metrics (`Always`).
-* Checkpoints for separate training 'runs' under the same id are saved to separate time-stamped directories, with the naming format `DD.MM.YYYY_HH.MM.SS`.
-* A new `--resume_from` training script parameter allows a previously saved checkpoint to be passed directly to the script.
-* The `--checkpoint_every` parameter now applies at the epoch level only.
-* The `--max_checkpoints` parameter, which determines the number of checkpoints retained on disk during training, can now be set to `None`, to retain all checkpoints (no maximum).
-* In-training audio generation can be switched off, through the new `--generate` parameter (`True` by default).
-* In-training audio generation, when enabled, is aligned with checkpointing frequency (determined by `--checkpoint_every`). Audio is only generated when a new checkpoint has been saved.
-* A new `--reduce_learning_rate_after` parameter allows for the learning rate to dynamically adjust itself during training, decaying exponentially after the specified number of epochs.
-* A new `--early_stopping_patience` parameter determines the number of epochs without improvement after which training is automatically terminated (defaults to 3).
-
 -----------
 ### Table of Contents
 
@@ -52,6 +21,7 @@
 * [Generating Audio](https://github.com/rncm-prism/prism-samplernn#generating-audio)
 * [Resources](https://github.com/rncm-prism/prism-samplernn#resources)
 * [Acknowledgements](https://github.com/rncm-prism/prism-samplernn#acknowledgements)
+* [Version History](https://github.com/rncm-prism/prism-samplernn#version-history)
 -----------
 
 ## Features
@@ -284,3 +254,35 @@ The following is a list of resources providing further information on SampleRNN,
 ## Acknowledgements
 
 Thanks are extended to the rest of the [PRiSM team](https://www.rncm.ac.uk/research/research-centres-rncm/prism/prism-team/) for their help and support during development, and especially to [Dr Sam Salem](https://www.rncm.ac.uk/people/sam-salem/) for his immense patience, diligence and perseverance in testing the code.
+
+-----------
+
+## Version History
+
+### 03/12/20
+
+* Implemented validation step.
+* Added tuner script for hyperparameter optimization.
+* Removed ReLU activation from the final MLP layer.
+* Fixed linear quantization bug.
+
+### 08/09/20
+
+* Audio generation speed is now greatly improved (about 3-4 times faster).
+
+### 20/08/20
+
+* Changes to the `chunk_audio.py` script:
+   - The `--input_file` and `--output_dir` arguments were previously positional, now they are named arguments.
+   - It is no longer necessary to create the output directory beforehand, it will be created it if it does not exist (also no trailing slash is required when supplying the path to the directory).
+   - The script output now reports when a chunk is silent and will be omitted.
+   - When complete the script now reports the number of chunks processed and number of chunks omitted (for silence).
+* A new `--checkpoint_policy` parameter allows to set the policy for saving checkpoints - whether to only save the checkpoint when there has been an improvement in the training metrics (`Best`), or whether to always save them, regardless of changes to the metrics (`Always`).
+* Checkpoints for separate training 'runs' under the same id are saved to separate time-stamped directories, with the naming format `DD.MM.YYYY_HH.MM.SS`.
+* A new `--resume_from` training script parameter allows a previously saved checkpoint to be passed directly to the script.
+* The `--checkpoint_every` parameter now applies at the epoch level only.
+* The `--max_checkpoints` parameter, which determines the number of checkpoints retained on disk during training, can now be set to `None`, to retain all checkpoints (no maximum).
+* In-training audio generation can be switched off, through the new `--generate` parameter (`True` by default).
+* In-training audio generation, when enabled, is aligned with checkpointing frequency (determined by `--checkpoint_every`). Audio is only generated when a new checkpoint has been saved.
+* A new `--reduce_learning_rate_after` parameter allows for the learning rate to dynamically adjust itself during training, decaying exponentially after the specified number of epochs.
+* A new `--early_stopping_patience` parameter determines the number of epochs without improvement after which training is automatically terminated (defaults to 3).
