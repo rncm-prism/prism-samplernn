@@ -41,6 +41,7 @@
     - [Command Line Arguments](https://github.com/rncm-prism/prism-samplernn#command-line-arguments)
     - [Configuring the Model](https://github.com/rncm-prism/prism-samplernn#configuring-the-model)
     - [Resuming Training](https://github.com/rncm-prism/prism-samplernn#resuming-training)
+    - [Hyperparameter Optimization](https://github.com/rncm-prism/prism-samplernn#hyperparameter-optimization)
 * [Generating Audio](https://github.com/rncm-prism/prism-samplernn#generating-audio)
 * [Resources](https://github.com/rncm-prism/prism-samplernn#resources)
 * [Acknowledgements](https://github.com/rncm-prism/prism-samplernn#acknowledgements)
@@ -199,6 +200,27 @@ Model parameters are specified through a JSON configuration file, which may be p
 ### Resuming Training
 
 A training session that has been halted, perhaps by `Ctrl-C`, may be resumed from a previously saved checkpoint. The weights saved to the checkpoint will be loaded into a fresh model, resuming at the last epoch + 1. To enable this set `--resume` to `True`, and optionally the path to a checkpoint through the `--resume_from` parameter (ignored when `--resume` is `False`). If no such checkpoint is supplied the program will search through any previous training run directories for the latest checkpoint. If no checkpoint is found training will begin again from scratch.
+
+### Hyperparameter Optimization
+
+The variables which control the training process are known as _hyperparameters_. Typically these will remain fixed over the course of a single training session, as opposed to the model's internal parameters - its weights and biases - which are updated at each step. Hyperparameters determine the model's overall performance, so it is important to pick the right ones. This is often a difficult problem, but fortunately it is possible to automate the process. We have included a script, `tune.py`, which makes it possible to specify a hyperparameter 'search space', which the system can examine to find the optimal set of hyperparameters, a process know as hyperparameter tuning or optimization. The script makes use of [Keras Tuner](https://www.tensorflow.org/tutorials/keras/keras_tuner), a library for automated hyperparameter tuning from the developers of Keras.
+
+The `tune.py` script is very similar to `train.py`, except that instead of taking just a single value for each hyperparameter it takes a list of values, defining the search space for that hyperparameter. No separate JSON configuration file is required for the model, all hyperparameters being passed through the command line arguments. To run the tuning script, execute:
+
+```shell
+python tune.py \
+  --data_dir path/to/dataset \
+  --num_epochs 20 \
+  --big_frame_size 32 64 \
+  --frame_size 4 2 \
+  --batch_size 32 64 128 \
+  --seq_len 512 1024 \
+  --num_rnn_layers 2 4
+```
+
+Note that the frame sizes, which determine the number of samples consumed in a single timestep by each RNN tier, are here specified by two separate arguments, `big_frame_size` and `frame_size`. The value for `frame_size`, however, specifies not the number of samples but the number of lower RNN tier frames in one frame of the upper RNN tier. So, in the above if the tuner picks 64 as the current value of `big_frame_size` and 4 as the current value of `frame_size`, this means the lower RNN tier is processing 16 samples per frame (64 / 4).
+
+For more information on Keras Tuner see its [documentation pages](https://keras-team.github.io/keras-tuner/).
 
 -----------
 
