@@ -4,6 +4,13 @@
 
 -----------
 
+### UPDATES (03/12/20)
+
+* Implemented validation step.
+* Added tuner script for hyperparameter optimization.
+* Removed ReLU activation from the final MLP layer.
+* Fixed linear quantization bug.
+
 ### UPDATES (08/09/20)
 
 * Audio generation speed is now greatly improved (about 3-4 times faster).
