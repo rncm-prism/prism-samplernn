@@ -1,7 +1,9 @@
 # PRiSM SampleRNN  
 
 [PRiSM](https://www.rncm.ac.uk/research/research-centres-rncm/prism/) implementation of [SampleRNN: An Unconditional End-to-End Neural Audio Generation Model](https://arxiv.org/abs/1612.07837), for [TensorFlow 2](https://www.tensorflow.org/overview).
+
 -----------
+
 ### Table of Contents
 
 * [Features](https://github.com/rncm-prism/prism-samplernn#features)
