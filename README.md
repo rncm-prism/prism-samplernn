@@ -84,7 +84,7 @@ The architecture of the network conforms to the three-tier design proposed in th
 
 ### Preparing Data
 
-SampleRNN is designed to accept raw audio in the form of .wav files. We therefore need to preprocess our source .wav file by slicing it into chunks, using the supplied [chunk_audio.py](https://bitbucket.org/cmelen/prism-samplernn.py/master/chunk_audio.py) script:
+SampleRNN is designed to accept raw audio in the form of .wav files. We therefore need to preprocess our source .wav file by slicing it into chunks, using the supplied [chunk_audio.py](https://github.com/rncm-prism/prism-samplernn/blob/master/chunk_audio.py) script:
 
 ```shell
 python chunk_audio.py \
