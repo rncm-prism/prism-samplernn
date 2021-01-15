@@ -183,11 +183,13 @@ def generate(path, ckpt_path, config, num_seqs=NUM_SEQS, dur=OUTPUT_DUR, sample_
     temperature = get_temperature(temperature, num_seqs)
     # Precompute sample sequences, initialised to q_zero.
     samples = []
-    init_samples = tf.fill((model.batch_size, model.big_frame_size, 1), q_zero)
+    init_samples = np.full((model.batch_size, model.big_frame_size, 1), q_zero)
     # Set seed if provided.
     if seed is not None:
         seed_audio = load_seed_audio(seed, seed_offset, model.big_frame_size)
+        seed_audio = tf.convert_to_tensor(seed_audio)
         init_samples[:, :model.big_frame_size, :] = quantize(seed_audio, q_type, q_levels)
+    init_samples = tf.constant(init_samples, dtype=tf.int32)
     samples.append(init_samples)
     print_progress_every = NUM_FRAMES_TO_PRINT * model.big_frame_size
     start_time = time.time()
