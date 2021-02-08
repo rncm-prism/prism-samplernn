@@ -12,4 +12,6 @@ pip-selfcheck.json
 *.config.json
 !default.config.json
 *.wav
+*.zip
 *.log
+*.ipynb
