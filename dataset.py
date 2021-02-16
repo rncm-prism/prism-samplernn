@@ -14,11 +14,15 @@ def find_files(directory, pattern='*.wav'):
             files.append(os.path.join(root, filename))
     return files
 
+# We need an initial random shuffle which remains the same if we resume, we could use the second
+# argument to random.shuffle, but that's a BAD idea, see https://stackoverflow.com/a/19307329/795131
+# and https://stackoverflow.com/a/29684037/795131. The right way is to instantiate our own
+# random.Random instance, to get both decent randomness AND avoid polluting the global environment.
 def get_dataset_filenames_split(data_dir, val_size):
     files = find_files(data_dir)
     if not files:
-        raise ValueError("No audio files found in '{}'.".format(data_dir))
-    random.shuffle(files)
+        raise ValueError(f'No wav files found in {data_dir}.')
+    random.Random(4).shuffle(files)
     val_start = len(files) - val_size
     return files[: val_start], files[val_start :]
 
