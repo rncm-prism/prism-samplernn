@@ -190,14 +190,14 @@ The `tune.py` script is very similar to `train.py`, except that instead of takin
 python tune.py \
   --data_dir path/to/dataset \
   --num_epochs 20 \
-  --big_frame_size 32 64 \
-  --frame_size 4 2 \
+  --frame_sizes 16 64 \
+  --frame_sizes 32 128 \
   --batch_size 32 64 128 \
   --seq_len 512 1024 \
   --num_rnn_layers 2 4
 ```
 
-Note that the frame sizes, which determine the number of samples consumed in a single timestep by each RNN tier, are here specified by two separate arguments, `big_frame_size` and `frame_size`. The value for `frame_size`, however, specifies not the number of samples but the number of lower RNN tier frames in one frame of the upper RNN tier. So, in the above if the tuner picks 64 as the current value of `big_frame_size` and 4 as the current value of `frame_size`, this means the lower RNN tier is processing 16 samples per frame (64 / 4).
+Note that the frame sizes, which determine the number of samples consumed in a single timestep by each RNN tier, are here specified by two separate entries of the `frame_sizes` argument.
 
 For more information on Keras Tuner see its [documentation pages](https://keras-team.github.io/keras-tuner/).
 
