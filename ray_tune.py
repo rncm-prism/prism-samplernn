@@ -14,12 +14,22 @@ from train import optimizer_factory
 
 
 def get_arguments():
+
+    def check_bool(value):
+        val = str(value).upper()
+        if 'TRUE'.startswith(val):
+            return True
+        elif 'FALSE'.startswith(val):
+            return False
+        else:
+           raise ValueError('Argument is neither `True` nor `False`')
+
     parser = argparse.ArgumentParser(description='PRiSM SampleRNN Model Tuner')
     parser.add_argument('--data_dir',                   type=str,   required=True,
                                                         help='Path (absolute) to the directory containing the training data.')
     parser.add_argument('--id',                         type=str,   default='default', help='Id for the model tuning session')
     parser.add_argument('--logdir',                     type=str,   help='Path (absolute) to the directory to store results.')
-    parser.add_argument('--verbose',                    type=int,   default=True, help='Model training verbosity')
+    parser.add_argument('--verbose',                    type=check_bool,   default=True, help='Model training verbosity')
     parser.add_argument('--num_trials',                 type=int,   default=1, help='Number of trials (number of times to sample the search space)')
     parser.add_argument('--num_epochs',                 type=int,   default=30, help='Number of training epochs')
     parser.add_argument('--type',                       type=str,   default='bayesian', choices=['bayesian', 'random_search'],
