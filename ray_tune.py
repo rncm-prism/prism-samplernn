@@ -165,10 +165,6 @@ if __name__ == "__main__":
         scheduler=sched,
         search_alg=search,
         mode="min",
-        stop={
-            "val_loss": 0.25,
-            "training_iteration": 10
-        },
         num_samples=10,
         resources_per_trial={
             "cpu": 1,
