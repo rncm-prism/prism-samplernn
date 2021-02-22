@@ -6,6 +6,12 @@ import tensorflow as tf
 from samplernn import (load_audio, quantize)
 
 
+def round_to(x, base=5):
+    return base * round(x/base)
+
+def truncate_to(x, base):
+    return int(np.floor(x / float(base))) * base
+
 def find_files(directory, pattern='*.wav'):
     '''Recursively finds all files matching the pattern.'''
     files = []
@@ -18,11 +24,20 @@ def find_files(directory, pattern='*.wav'):
 # argument to random.shuffle, but that's a BAD idea, see https://stackoverflow.com/a/19307329/795131
 # and https://stackoverflow.com/a/29684037/795131. The right way is to instantiate our own
 # random.Random instance, to get both decent randomness AND avoid polluting the global environment.
-def get_dataset_filenames_split(data_dir, val_size):
+def get_dataset_filenames_split(data_dir, val_frac, batch_size):
     files = find_files(data_dir)
+    assert batch_size <= len(files), 'Batch size exceeds the corpus length'
     if not files:
         raise ValueError(f'No wav files found in {data_dir}.')
     random.Random(4).shuffle(files)
+    # Truncate to the closest batch_size multiple.
+    if not (len(files) % batch_size) == 0:
+        warnings.warn('Truncating dataset, length is not equally divisible by batch size')
+        idx = truncate_to(len(files), batch_size)
+        files = files[: idx]
+    val_size = len(files) * val_frac
+    val_size = round_to(val_size, batch_size)
+    if val_size == 0 : val_size = batch_size
     val_start = len(files) - val_size
     return files[: val_start], files[val_start :]
 
@@ -42,7 +57,7 @@ def get_subseq(dataset, batch_size, seq_len, overlap, q_type, q_levels):
 
 def get_dataset(files, num_epochs, batch_size, seq_len, overlap, drop_remainder=False, shuffle=True, q_type='mu-law', q_levels=256):
     dataset = tf.data.Dataset.from_generator(
-        lambda: load_audio(files, batch_size, shuffle=shuffle),
+        lambda: load_audio(files, shuffle=shuffle),
         output_types=tf.float32,
         output_shapes=((None, 1))
     )

@@ -46,7 +46,7 @@ SAMPLE_RATE = 22050 # Sample rate of generated audio
 SAMPLING_TEMPERATURE = 0.75
 SEED_OFFSET = 0
 MAX_GENERATE_PER_EPOCH = 1
-NUM_VAL_BATCHES = 1
+VAL_FRAC = 0.1
 
 
 def get_arguments():
@@ -120,8 +120,8 @@ def get_arguments():
     parser.add_argument('--seed',                       type=str,            help='Path to audio for seeding')
     parser.add_argument('--seed_offset',                type=int,            default=SEED_OFFSET,
                                                         help='Starting offset of the seed audio')
-    parser.add_argument('--num_val_batches',            type=check_positive, default=NUM_VAL_BATCHES,
-                                                        help='Number of batches to reserve for validation')
+    parser.add_argument('--val_frac',                   type=float, default=VAL_FRAC,
+                                                        help='Fraction of the dataset to reserve for validaton. Will be rounded to the closest multiple of the batch size.')
     return parser.parse_args()
 
 # Optimizer factory adapted from WaveNet
@@ -199,7 +199,7 @@ def main():
     args = get_arguments()
 
     train_split, val_split = get_dataset_filenames_split(
-        args.data_dir, args.num_val_batches * args.batch_size)
+        args.data_dir, args.val_frac, args.batch_size)
 
     # Create training session directories
     logdir = os.path.join(args.logdir_root, args.id)
