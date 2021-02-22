@@ -19,9 +19,9 @@ def get_arguments():
                                                         help='Path (absolute) to the directory containing the training data.')
     parser.add_argument('--id',                         type=str,   default='default', help='Id for the model tuning session')
     parser.add_argument('--logdir',                     type=str,   help='Path (absolute) to the directory to store results.')
-    parser.add_argument('--verbose',                    type=int,   default=2, help='Model training verbosity')
-    parser.add_argument('--num_epochs',                 type=int,   default=30,
-                                                        help='Number of training epochs')
+    parser.add_argument('--verbose',                    type=int,   default=True, help='Model training verbosity')
+    parser.add_argument('--num_trials',                 type=int,   default=1, help='Number of trials (number of times to sample the search space)')
+    parser.add_argument('--num_epochs',                 type=int,   default=30, help='Number of training epochs')
     parser.add_argument('--type',                       type=str,   default='bayesian', choices=['bayesian', 'random_search'],
                                                         help='Type of tuning algorithm to use, either Bayesian Optimization or Random Search.')
     #parser.add_argument('--metric',                     type=str,   default='val_loss', choices=['loss', 'accuracy', 'val_loss', 'val_accuracy'],
@@ -109,6 +109,8 @@ def train(config):
     # Get subseqs per epoch...
     steps_per_epoch = len(train_split) // batch_size * steps_per_batch
 
+    verbose = 1 if args.verbose==True else 2
+
     # Train...
     history = model.fit(
         train_dataset,
@@ -117,7 +119,7 @@ def train(config):
         shuffle=False,
         validation_data=val_dataset,
         callbacks=[TuneReporter()],
-        verbose=args.verbose
+        verbose=verbose
     )
 
 class TuneReporter(tf.keras.callbacks.Callback):
@@ -165,13 +167,17 @@ if __name__ == "__main__":
         scheduler=sched,
         search_alg=search,
         mode="min",
-        num_samples=10,
+        num_samples=args.num_trials,
         resources_per_trial={
             "cpu": 1,
             "gpu": 1
         })
     print('\n')
-    print("Ssearch summary:", analysis.get_best_config(
+    print("Best Hparams:", analysis.get_best_config(
+        metric="val_loss"
+    ))
+    print('\n')
+    print("Results Summary:", analysis.get_best_trial(
         metric="val_loss"
     ))
 
