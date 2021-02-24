@@ -162,6 +162,7 @@ if __name__ == "__main__":
     sched = AsyncHyperBandScheduler(
         time_attr="training_iteration",
         metric="val_loss",
+        mode="min",
         max_t=400,
         grace_period=20)
         
@@ -176,7 +177,6 @@ if __name__ == "__main__":
         local_dir=args.logdir,
         scheduler=sched,
         search_alg=search,
-        mode="min",
         num_samples=args.num_trials,
         resources_per_trial={
             "cpu": 1,
