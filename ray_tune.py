@@ -184,10 +184,10 @@ if __name__ == "__main__":
         })
     print('\n')
     print("Best Hparams:", analysis.get_best_config(
-        metric="val_loss"))
+        metric="val_loss", mode="min"))
     print('\n')
     print("Results Summary:", analysis.get_best_trial(
-        metric="val_loss").last_result)
+        metric="val_loss", mode="min").last_result)
 
 # Run it like:
 '''
