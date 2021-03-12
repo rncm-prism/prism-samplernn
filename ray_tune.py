@@ -41,7 +41,7 @@ def get_arguments():
     parser.add_argument('--early_stopping_patience',    type=int,   default=3,
                                                         help='Number of epochs with no improvement after which training will be stopped.')
     parser.add_argument('--val_frac',                   type=float, default=0.1,
-                                                        help='Fraction of the dataset to reserve for validaton. Will be rounded to the closest multiple of the batch size.')
+                                                        help='Fraction of the dataset to be set aside for validation, rounded to the nearest multiple of the batch size. Defaults to 0.1, or 10%%.')
     parser.add_argument('--frame_sizes',                type=int,   required=True, nargs='+', action='append',
                                                         help='Frame sizes (in samples) of the two upper tiers in the model, in ascending order. Note that the frame size of the upper tier must be an even multiple of that of the lower tier')
     parser.add_argument('--batch_size',                 type=int,   required=True, nargs='+', help='Size of the mini-batch')

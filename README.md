@@ -42,13 +42,14 @@
 
 The following Python packages are required:
 
-- TensorFlow 2
-- Librosa
-- Natsort
-- Pydub
-- Keras Tuner
+- [TensorFlow 2](https://www.tensorflow.org/)
+- [Librosa](https://librosa.org/doc/latest/index.html)
+- [Natsort](https://github.com/SethMMorton/natsort)
+- [Pydub](https://github.com/jiaaro/pydub)
 
-Note that Pydub is only required for the audio chunking script, and Keras Tuner for the model tuning script.
+Note that Pydub is only required for the audio chunking script.
+
+If you are interested in hyperparameter optimization we provide two scripts especially for that purpose, both of which require the installation of additional Python libraries. For more details on these see the section below on [Hyperparameter Optimization](https://github.com/rncm-prism/prism-samplernn#hyperparameter-optimization).
 
 ### CUDA
 
@@ -113,7 +114,7 @@ python train.py \
 
 Checkpoints storing the current state of the model are periodically saved to disk during training, with the default behaviour being to save a checkpoint at the end of each epoch. This interval may be modified through the `--checkpoint_every` parameter.  By default every checkpoint will be saved, but this behaviour can be controlled using the `--checkpoint_policy` parameter. Pass `Best` to save only the latest best checkpoint according to the training metrics (loss and accuracy). An audio file is also generated each time a checkpoint is saved, which may be used to assess the progress of the training (generation may be switched off by setting `--generate` to `False`).
 
-Before training begins a certain portion of the input dataset is reserved for _validation_, which occurs at the end of each epoch. This is a stage during which the network is exposed to (but not trained on) a certain number of batches, usually small in number, a value determined by the `--num_val_batches` parameter (defaults to 1). The purpose of validation is to test whether the network can generalize to inputs that it has not seen before. How well the network does when processing this unseen data can provide insight into whether the network is [overfitting or underfitting](https://www.tensorflow.org/tutorials/keras/overfit_and_underfit) (see the [Statistics](https://github.com/rncm-prism/prism-samplernn#statistics) section below for how validation statistics are reported). Note that since at least one batch is required for the validation set it is important that enough batches are made available to the network. A typical validation set size would be about 10-15% of the total data available, so if our complete dataset is 520 chunks in length, and our batch size is 64, 1 batch will be sufficient for validation (since 64 is roughly 10-15% of 520).
+Before training begins a certain portion of the input dataset is reserved for _validation_, which occurs at the end of each epoch. This is a stage during which the network is exposed to (but not trained on) a small portion of the dataset, the purpose of which is to test whether the network can generalize to inputs that it has not seen before. How well the network does when processing this unseen data can provide insight into whether the network is [overfitting or underfitting](https://www.tensorflow.org/tutorials/keras/overfit_and_underfit) (see the [Statistics](https://github.com/rncm-prism/prism-samplernn#statistics) section below for how validation statistics are reported). The size of the validation set is determined by the `val_frac` parameter, which defaults to 0.1, yielding a 9/1 split between training and validation data, the most common division (note that the actual values are rounded to the nearest multiple of the batch size).
 
 ### Statistics
 
@@ -158,7 +159,8 @@ The following table lists the hyper-parameters that may be passed at the command
 | `temperature`            | Sampling temperature for generated audio. Multiple values may be passed, to match the number of sequences to be generated. If the number of values exceeds the value of `--num_seqs`, the list will be truncated to match it. If too few values are provided the last value will be repeated until the list length matches the number of requested sequences. | 0.75         | No        |
 | `seed`                   | Path to audio for seeding when generating audio. | `None`         | No        |
 | `seed_offset`            | Starting offset of the seed audio. | 0         | No        |
-| `num_val_batches`        | Number of batches to reserve for validation. | 1         | No        |
+| `val_frac`               | Fraction of the dataset to be set aside for validation, rounded to the nearest multiple of the batch size. Defaults to 0.1, or 10%. | 0.1         | No        |
+| `num_val_batches`        | Number of batches to reserve for validation. DEPRECATED: This parameter now has no effect, it is retained for backward-compatibility only and will be removed in a future release. Use `val_frac` instead. | 1         | No        |
 
 ### Configuring the Model
 
@@ -182,12 +184,18 @@ A training session that has been halted, perhaps by `Ctrl-C`, may be resumed fro
 
 ### Hyperparameter Optimization
 
-The variables which control the training process are known as _hyperparameters_. Typically these will remain fixed over the course of a single training session, as opposed to the model's internal parameters - its weights and biases - which are updated at each step. Hyperparameters determine the model's overall performance, so it is important to pick the right ones. This is often a difficult problem, but fortunately it is possible to automate the process. We have included a script, `tune.py`, which makes it possible to specify a hyperparameter 'search space', which the system can examine to find the optimal set of hyperparameters, a process know as hyperparameter tuning or optimization. The script makes use of [Keras Tuner](https://www.tensorflow.org/tutorials/keras/keras_tuner), a library for automated hyperparameter tuning from the developers of Keras.
+The variables which control the training process are known as _hyperparameters_. Typically these will remain fixed over the course of a single training session, as opposed to the model's internal parameters - its weights and biases - which are updated at each step. Hyperparameters determine the model's overall performance, so it is important to pick the right ones. This is often a difficult problem, but fortunately it is possible to automate the process. We have included two scripts, `keras_tuner.py` and `ray_tune.py`, which each use a separate hyperparameter tuning systems. Both work by defining a hyperparameter 'search space', which the system can examine to find the optimal set of hyperparameters, a process know as hyperparameter tuning or optimization. Details for how to use each script can be found below.
 
-The `tune.py` script is very similar to `train.py`, except that instead of taking just a single value for each hyperparameter it takes a list of values, defining the search space for that hyperparameter. No separate JSON configuration file is required for the model, all hyperparameters being passed through the command line arguments. To run the tuning script, execute:
+#### Hyperparameter Optimization with Keras Tuner
+
+[Keras Tuner](https://www.tensorflow.org/tutorials/keras/keras_tuner) is a library for automated hyperparameter tuning from the developers of [Keras](https://keras.io/). Install the latest version (inside the conda environment) with:
+
+`pip install -U keras-tuner`
+
+The `keras_tuner.py` script is very similar to `train.py`, except that instead of taking just a single value for each hyperparameter it takes a list of values, defining the search space for that hyperparameter. No separate JSON configuration file is required for the model, all hyperparameters being passed through the command line arguments. To run the script, execute:
 
 ```shell
-python tune.py \
+python keras_tuner.py \
   --data_dir path/to/dataset \
   --num_epochs 20 \
   --frame_sizes 16 64 \
@@ -197,9 +205,84 @@ python tune.py \
   --num_rnn_layers 2 4
 ```
 
-Note that the frame sizes, which determine the number of samples consumed in a single timestep by each RNN tier, are here specified by two separate entries of the `frame_sizes` argument.
+Note that the frame sizes, which determine the number of samples consumed in a single timestep by each RNN tier, are here specified by two separate entries of the `frame_sizes` argument. Each defines a separate entry in the search space.
+
+For the full list of parameters to `keras_tuner.py` run the script with the `--help` option.
+
+At the end of the tuning process the script will print a summary of the best trial to standard output, in the following format (`Score` is simply the objective, which defaults to the `val_loss`):
+
+```shell
+[Trial summary]
+ |-Trial ID: b366a8c644b6b0a28ef0c378886c81fe
+ |-Score: 0.9532838344573975
+ |-Best step: 3
+ > Hyperparameters:
+ |-batch_size: 64
+ |-frame_sizes: 32 128
+ |-dim: 1024
+ |-learning_rate: 0.001
+ |-momentum: 0.95
+ |-num_rnn_layers: 2
+ |-rnn_dropout: 0.25
+ |-seq_len: 512
+```
 
 For more information on Keras Tuner see its [documentation pages](https://keras-team.github.io/keras-tuner/).
+
+#### Hyperparameter Optimization with Ray Tune
+
+[Ray Tune](https://docs.ray.io/en/master/tune/index.html) is a library found within [Ray](https://ray.io/), a framework for distributed computing with Python. Unlike `keras_tuner.py`, the `ray_tune.py` script allows for tuning across multiple GPUs simultaneously, greatly increasing the speed and efficiency of the tuning process. Install the latest version of Ray (inside the conda environment) with:
+
+`pip install -U ray`
+
+You might also need to install a few additional packages:
+
+`pip install tensorboardX`
+
+`pip install 'ray[tune]'`
+
+The `ray_tune.py` script closely resembles `keras_tuner.py`, except for the addition of a few extra parameters:
+
+```shell
+python ray_tune.py \
+  --data_dir path/to/dataset \
+  --num_cpus 4 \
+  --num_gpus 2 \
+  --num_trials 10 \
+  --num_epochs 20 \
+  --frame_sizes 16 64 \
+  --frame_sizes 32 128 \
+  --batch_size 32 64 128 \
+  --seq_len 512 1024 \
+  --num_rnn_layers 2 4
+```
+
+As with `keras_tuner.py`, the frame sizes are specified by two separate entries of the `frame_sizes` argument. The additional arguments relate to distributed training - `--num_cpus`, which specifies the number of cpu cores to allocate, and `--num_gpus`, which specifies the number of gpus to use (which can be a single gpu).
+
+For the full list of parameters to `ray_tune.py` run the script with the `--help` option.
+
+The final output, when all trials have been run, is a JSON object containing the best hyperparameters, for example:
+
+```shell
+{
+  "batch_size": 128,
+  "dim": 2048,
+  "frame_sizes": [
+    32,
+    128
+  ],
+  "learning_rate": 0.001,
+  "momentum": 0.5,
+  "num_rnn_layers": 2,
+  "q_type": "mu-law",
+  "rnn_dropout": 0.6,
+  "rnn_type": "gru",
+  "seq_len": 1024,
+  "skip_conn": true
+}
+```
+
+A summary of the best trial, including its metadata (such as training iterations, total duration, etc.), will also be printed.
 
 -----------
 

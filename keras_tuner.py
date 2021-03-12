@@ -1,7 +1,5 @@
 import tensorflow as tf
 import kerastuner as kt
-import json
-import random
 import collections
 import numpy as np
 import argparse
@@ -26,7 +24,8 @@ def get_arguments():
     parser.add_argument('--max_trials',                 type=int,   default=10, help='Maximum nuber of trials to run')
     parser.add_argument('--early_stopping_patience',    type=int,   default=3,
                                                         help='Number of epochs with no improvement after which training will be stopped.')
-    parser.add_argument('--num_val_batches',            type=int,   default=1, help='Number of batches to reserve for validation')
+    parser.add_argument('--val_frac',                   type=float, default=0.1,
+                                                        help='Fraction of the dataset to be set aside for validation, rounded to the nearest multiple of the batch size. Defaults to 0.1, or 10%%.')
     parser.add_argument('--frame_sizes',                type=int,   required=True, nargs='+', action='append',
                                                         help='Frame sizes (in samples) of the two upper tiers in the model, in ascending order. Note that the frame size of the upper tier must be an even multiple of that of the lower tier')
     parser.add_argument('--batch_size',                 type=int,   required=True, nargs='+', help='Size of the mini-batch')
@@ -36,7 +35,8 @@ def get_arguments():
     parser.add_argument('--num_rnn_layers',             type=int,   default=[1, 2, 4, 8], nargs='+', help='Number of RNN layers')
     parser.add_argument('--q_type',                     type=str,   default=['mu-law', 'linear'], nargs='+', help='Quantization type')
     parser.add_argument('--rnn_dropout',                type=float, default=[0.2, 0.4, 0.6], nargs='+', help='Size of the RNN dropout')
-    parser.add_argument('--optimizer',                  type=str,   default='adam', choices=optimizer_factory.keys(), help='Type of training optimizer to use')
+    parser.add_argument('--optimizer',                  type=str,   default='adam', choices=optimizer_factory.keys(),
+                                                        help='Type of training optimizer to use')
     parser.add_argument('--learning_rate',              type=float, default=[1e-2, 1e-3, 1e-4], nargs='+', help='Learning rate of training')
     parser.add_argument('--momentum',                   type=float, default=[0.1, 0.5, 0.9], nargs='+', help='Optimizer momentum')
     return parser.parse_args()
@@ -61,8 +61,7 @@ def build_model(hp):
         rnn_type=hp.Choice('rnn_type', args.rnn_type),
         num_rnn_layers=hp.Choice('num_rnn_layers', args.num_rnn_layers),
         emb_size=256,
-        #skip_conn=hp.Boolean('skip_conn'),
-        skip_conn=False,
+        skip_conn=hp.Boolean('skip_conn'),
         rnn_dropout=hp.Choice('rnn_dropout', args.rnn_dropout)
     )
     optimizer = optimizer_factory[args.optimizer](
@@ -74,22 +73,10 @@ def build_model(hp):
     model.compile(optimizer=optimizer, loss=compute_loss, metrics=[train_accuracy])
     return model
 
-'''
-def get_dataset_filenames_split(data_dir, val_size, test_size):
-    files = find_files(data_dir)
-    if not files:
-        raise ValueError("No audio files found in '{}'.".format(data_dir))
-    #random.shuffle(files)
-    num_files = len(files)
-    test_start = num_files - test_size
-    val_start = test_start - val_size
-    return files[: val_start], files[val_start : test_start], files[test_start :]
-'''
-
 # Tuner subclass.
 class SampleRNNTuner(kt.Tuner):
 
-    def run_trial(self, trial, data_dir, num_val_batches, objective, *args, **kwargs):
+    def run_trial(self, trial, data_dir, val_frac, objective, *args, **kwargs):
         hp = trial.hyperparameters
         model = self.hypermodel.build(trial.hyperparameters)
 
@@ -102,9 +89,7 @@ class SampleRNNTuner(kt.Tuner):
         q_levels = 256
 
         (train_split, val_split) = get_dataset_filenames_split(
-            data_dir,
-            num_val_batches * model.batch_size
-        )
+            data_dir, val_frac, model.batch_size)
 
         # Train, Val and Test Datasets
         train_dataset = get_dataset(train_split, num_epochs, batch_size, seq_len, overlap,
@@ -186,7 +171,7 @@ callbacks = [
 
 tuner.search(
     data_dir=args.data_dir,
-    num_val_batches=args.num_val_batches,
+    val_frac=args.val_frac,
     objective=args.objective,
     num_epochs=args.num_epochs,
     callbacks=callbacks,
