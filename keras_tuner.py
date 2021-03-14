@@ -183,7 +183,7 @@ tuner.results_summary()
 
 # Run it like:
 '''
-nohup python tune.py \
+nohup python keras_tuner.py \
   --data_dir path/to/dataset \
   --num_epochs 2 \
   --frame_sizes 16 64 \
