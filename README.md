@@ -20,6 +20,8 @@
     - [Configuring the Model](https://github.com/rncm-prism/prism-samplernn#configuring-the-model)
     - [Resuming Training](https://github.com/rncm-prism/prism-samplernn#resuming-training)
     - [Hyperparameter Optimization](https://github.com/rncm-prism/prism-samplernn#hyperparameter-optimization)
+        - [Hyperparameter Optimization with Keras Tuner](https://github.com/rncm-prism/prism-samplernn#hyperparameter-optimization-with-keras-tuner)
+        - [Hyperparameter Optimization with Ray Tune](https://github.com/rncm-prism/prism-samplernn#hyperparameter-optimization-with-ray-tune)
 * [Generating Audio](https://github.com/rncm-prism/prism-samplernn#generating-audio)
 * [Resources](https://github.com/rncm-prism/prism-samplernn#resources)
 * [Acknowledgements](https://github.com/rncm-prism/prism-samplernn#acknowledgements)
