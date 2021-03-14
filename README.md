@@ -344,6 +344,12 @@ Thanks are extended to the rest of the [PRiSM team](https://www.rncm.ac.uk/resea
 
 ## Version History
 
+### 14/03/21
+
+* Added new hparam optimization module, [ray_tune.py](https://github.com/rncm-prism/prism-samplernn/blob/master/ray_tune.py), based on [Ray Tune](https://docs.ray.io/en/master/tune/index.html).
+* Renamed the old tune.py module to [keras_tuner.py](https://github.com/rncm-prism/prism-samplernn/blob/master/keras_tuner.py), since it uses [Keras Tuner](https://www.tensorflow.org/tutorials/keras/keras_tuner).
+* The size of the validation set is now computed as a fraction of the total dataset size. This is configured using the new `val_frac` parameter, which defaults to 0.1 (= 10% of total dataset). The old `num_val_batches` is retained for now, but has no function and will be removed in a future release.
+
 ### 03/12/20
 
 * Implemented validation step.
