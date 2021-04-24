@@ -115,7 +115,7 @@ def get_arguments():
                                                         help='Whether to generate audio output during training. Generation is aligned with checkpoints, meaning that audio is only generated after a new checkpoint has been created.')
     parser.add_argument('--max_generate_per_epoch',     type=check_positive, default=MAX_GENERATE_PER_EPOCH,
                                                         help='Maximum number of output files to generate at the end of each epoch')
-    parser.add_argument('--temperature',                type=float,          default=SAMPLING_TEMPERATURE,
+    parser.add_argument('--temperature',                type=str,            default=SAMPLING_TEMPERATURE,
                                                         help='Sampling temperature for generated audio')
     parser.add_argument('--seed',                       type=str,            help='Path to audio for seeding')
     parser.add_argument('--seed_offset',                type=int,            default=SEED_OFFSET,
