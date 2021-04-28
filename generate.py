@@ -14,7 +14,7 @@ from samplernn import (SampleRNN, write_wav, quantize, dequantize, unsqueeze)
 OUTPUT_DUR = 3 # Duration of generated audio in seconds
 SAMPLE_RATE = 22050 # Sample rate of generated audio
 NUM_SEQS = 1
-SAMPLING_TEMPERATURE = 0.75
+SAMPLING_TEMPERATURE = ['0.95']
 SEED_OFFSET = 0
 
 
@@ -80,15 +80,15 @@ def load_seed_audio(path, offset, length):
 
 NUM_FRAMES_TO_PRINT = 4
 
-def parse_temperature(temperature, batch_size):
+def parse_temperature(temperature, num_seqs):
     temperature = [ast.literal_eval(t) for t in temperature]
-    if batch_size > 1:
-        if len(temperature) < batch_size:
-            last_val = temperature[len(temperature)-1]
-            while len(temperature) < batch_size:
+    if num_seqs > 1:
+        if len(temperature) < num_seqs:
+            last_val = temperature[-1]
+            while len(temperature) < num_seqs:
                 temperature = temperature + [last_val]
-        elif len(temperature) > batch_size:
-            temperature = temperature[:batch_size]
+        elif len(temperature) > num_seqs:
+            temperature = temperature[:num_seqs]
     return temperature
 
 def interpolgen(nsamps, xpoints, ypoints):
