@@ -3,6 +3,7 @@ import argparse
 import time
 import json
 import ast
+import numbers
 
 import tensorflow as tf
 import numpy as np
@@ -80,8 +81,17 @@ def load_seed_audio(path, offset, length):
 
 NUM_FRAMES_TO_PRINT = 4
 
-def parse_temperature(temperature, num_seqs):
+def parse_temperature_vector(tvect, total_samps):
+    fn = lambda x : int(x * total_samps)
+    parsed = list(map(fn, tvect))
+    parsed.sort()
+    return parsed
+
+def parse_temperature(temperature, num_seqs, total_samps):
     temperature = [ast.literal_eval(t) for t in temperature]
+    temperature = [t if isinstance(t, numbers.Number)
+                     else [parse_temperature_vector(t[0], total_samps), t[1]]
+                     for t in temperature]
     if num_seqs > 1:
         if len(temperature) < num_seqs:
             last_val = temperature[-1]
@@ -106,17 +116,24 @@ def interpolgen(nsamps, xpoints, ypoints):
             cy = cy + dy
             yield(cx, cy)
 
-import numbers
-
-def get_temperature(parsed_temp, num_seqs, nsamps):
+def get_temperature(parsed_temp, nsamps):
     temps = [t if isinstance(t, numbers.Number)
                else interpolgen(nsamps, t[0], t[1])
                for t in parsed_temp]
     for _ in range(0, nsamps):
-        out = [[t] if isinstance(t, numbers.Number)
-                   else [next(t)[1]]
-                   for t in temps]
-        yield(tf.constant(out, dtype=tf.float64))
+        '''
+        We might have a discrepancy between the value of nsamps (actually
+        the number of top tier frames) and the size of temps (due to precision
+        inside interpolgen). So we catch StopIteration here. But we need a
+        better solution. Same issue with the main loop inside generate() below.
+        '''
+        try:
+            out = [[t] if isinstance(t, numbers.Number)
+                    else [next(t)[1]]
+                    for t in temps]
+            yield(tf.constant(out, dtype=tf.float64))
+        except StopIteration:
+            break
 
 def generate(path, ckpt_path, config, num_seqs=NUM_SEQS, dur=OUTPUT_DUR, sample_rate=SAMPLE_RATE,
              temperature=SAMPLING_TEMPERATURE, seed=None, seed_offset=None):
@@ -136,20 +153,23 @@ def generate(path, ckpt_path, config, num_seqs=NUM_SEQS, dur=OUTPUT_DUR, sample_
     init_samples = tf.constant(init_samples, dtype=tf.int32)
     samples.append(init_samples)
     num_frames = num_samps // model.big_frame_size
-    parsed_temps = parse_temperature(temperature, num_seqs)
-    temperature = get_temperature(parsed_temps, num_seqs, num_frames)
+    parsed_temps = parse_temperature(temperature, num_seqs, dur * sample_rate)
+    temperature = get_temperature(parsed_temps, num_frames)
     print_progress_every = NUM_FRAMES_TO_PRINT * model.big_frame_size
     start_time = time.time()
     for i in range(0, num_frames):
-        t = i * model.big_frame_size
-        # Generate samples
-        frame_samples = model(samples[i], training=False, temperature=next(temperature))
-        samples.append(frame_samples)
-        # Monitor progress
-        if t % print_progress_every == 0:
-            end = min(t + print_progress_every, num_samps)
-            step_dur = time.time() - start_time
-            print(f'Generated samples {t+1} - {end} of {num_samps} (time elapsed: {step_dur:.3f} seconds)')
+        try:
+            t = i * model.big_frame_size
+            # Generate samples
+            frame_samples = model(samples[i], training=False, temperature=next(temperature))
+            samples.append(frame_samples)
+            # Monitor progress
+            if t % print_progress_every == 0:
+                end = min(t + print_progress_every, num_samps)
+                step_dur = time.time() - start_time
+                print(f'Generated samples {t+1} - {end} of {num_samps} (time elapsed: {step_dur:.3f} seconds)')
+        except StopIteration:
+            break
     samples = tf.concat(samples, axis=1)
     samples = samples[:, model.big_frame_size:, :]
     # Save sequences to disk
