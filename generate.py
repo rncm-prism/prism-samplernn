@@ -212,7 +212,7 @@ def generate(path, ckpt_path, config, num_seqs=NUM_SEQS, dur=OUTPUT_DUR, sample_
         seq = np.reshape(samples[i], (-1, 1))[model.big_frame_size :].tolist()
         audio = dequantize(seq, q_type, q_levels)
         file_name = f'{path}({i})' if model.batch_size > 1 else path
-        file_name = f'{file_name}_t={temperature}.wav'
+        file_name = f'{file_name}_t={temperature[i][0]}.wav'
         write_wav(file_name, audio, sample_rate)
         print(f'Generated sample output to {file_name}')
     print('Done')
