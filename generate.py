@@ -15,7 +15,7 @@ from samplernn import (SampleRNN, write_wav, quantize, dequantize, unsqueeze)
 OUTPUT_DUR = 3 # Duration of generated audio in seconds
 SAMPLE_RATE = 22050 # Sample rate of generated audio
 NUM_SEQS = 1
-SAMPLING_TEMPERATURE = 0.75
+SAMPLING_TEMPERATURE = 0.95
 SEED_OFFSET = 0
 
 
@@ -206,14 +206,15 @@ def generate(path, ckpt_path, config, num_seqs=NUM_SEQS, dur=OUTPUT_DUR, sample_
     samples = tf.concat(samples, axis=1)
     samples = samples[:, model.big_frame_size:, :]
     # Save sequences to disk
-    path = path.split('.wav')[0]
+    epoch = ckpt_path.split('/model.ckpt-')[-1]
+    path = f'{path.split(".wav")[0]}_e={epoch}'
     for i in range(model.batch_size):
         seq = np.reshape(samples[i], (-1, 1))[model.big_frame_size :].tolist()
         audio = dequantize(seq, q_type, q_levels)
-        file_name = '{}_{}'.format(path, str(i)) if model.batch_size > 1 else path
-        file_name = '{}.wav'.format(file_name)
+        file_name = f'{path}({i})' if model.batch_size > 1 else path
+        file_name = f'{file_name}_t={temperature}.wav'
         write_wav(file_name, audio, sample_rate)
-        print('Generated sample output to {}'.format(file_name))
+        print(f'Generated sample output to {file_name}')
     print('Done')
 
 
