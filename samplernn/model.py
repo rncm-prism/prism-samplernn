@@ -92,7 +92,7 @@ class SampleRNN(tf.keras.Model):
     def inference_step(self, inputs, temperature):
         num_samps = self.big_frame_size
         samples = inputs
-        big_frame_outputs = self.big_frame_rnn(tf.cast(inputs, tf.float32))
+        big_frame_outputs = self.big_frame_rnn(this.cast_to_lowest(inputs))
         for t in range(num_samps, num_samps * 2):
             if t % self.frame_size == 0:
                 frame_inputs = samples[:, t - self.frame_size : t, :]
@@ -100,7 +100,7 @@ class SampleRNN(tf.keras.Model):
                     self.big_frame_size // self.frame_size
                 )
                 frame_outputs = self.frame_rnn(
-                    tf.cast(frame_inputs, tf.float32),
+                    this.cast_to_lowest(frame_inputs),
                     conditioning_frames=unsqueeze(big_frame_outputs[:, big_frame_output_idx, :], 1))
             sample_inputs = samples[:, t - self.frame_size : t, :]
             frame_output_idx = t % self.frame_size
@@ -118,15 +118,19 @@ class SampleRNN(tf.keras.Model):
         self.big_frame_rnn.reset_states()
         self.frame_rnn.reset_states()
 
+    def cast_to_lowest(self, inputs):
+        # Casts to float16, the policy's lowest-precision dtype
+        return self._mixed_precision_policy.cast_to_lowest(inputs)
+
     def call(self, inputs, training=True, temperature=1.0):
         if training==True:
             # UPPER TIER
             big_frame_outputs = self.big_frame_rnn(
-                tf.cast(inputs, tf.float32)[:, : -self.big_frame_size, :]
+                this.cast_to_lowest(inputs)[:, : -self.big_frame_size, :]
             )
             # MIDDLE TIER
             frame_outputs = self.frame_rnn(
-                tf.cast(inputs, tf.float32)[:, self.big_frame_size-self.frame_size : -self.frame_size, :],
+                this.cast_to_lowest(inputs)[:, self.big_frame_size-self.frame_size : -self.frame_size, :],
                 conditioning_frames=big_frame_outputs,
             )
             # LOWER TIER (SAMPLES)
