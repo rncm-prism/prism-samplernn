@@ -13,7 +13,7 @@ from samplernn import (SampleRNN, write_wav, quantize, dequantize, unsqueeze)
 
 
 OUTPUT_DUR = 3 # Duration of generated audio in seconds
-SAMPLE_RATE = 22050 # Sample rate of generated audio
+SAMPLE_RATE = 16000 # Sample rate of generated audio
 NUM_SEQS = 1
 SAMPLING_TEMPERATURE = 0.95
 SEED_OFFSET = 0

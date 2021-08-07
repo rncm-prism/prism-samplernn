@@ -114,7 +114,9 @@ python train.py \
   --sample_rate 16000
 ```
 
-Checkpoints storing the current state of the model are periodically saved to disk during training, with the default behaviour being to save a checkpoint at the end of each epoch. This interval may be modified through the `--checkpoint_every` parameter.  By default every checkpoint will be saved, but this behaviour can be controlled using the `--checkpoint_policy` parameter. Pass `Best` to save only the latest best checkpoint according to the training metrics (loss and accuracy). An audio file is also generated each time a checkpoint is saved, which may be used to assess the progress of the training (generation may be switched off by setting `--generate` to `False`).
+Checkpoints storing the current state of the model are periodically saved to disk during training, with the default behaviour being to save a checkpoint at the end of each epoch. This interval may be modified through the `--checkpoint_every` parameter.  By default every checkpoint will be saved, but this behaviour can be controlled using the `--checkpoint_policy` parameter. Pass `Best` to save only the latest best checkpoint according to the training metrics (loss and accuracy).
+
+Each time a checkpoint is saved one or more audio files are also generated, which may be used to assess the progress of the training. The number of files generated is controlled by the value of the `--max_generate_per_epoch` parameter. Audio files are saved with names in the format `id_e=1_t=0.95`, with `id` being the id of the current training, `e` the current epoch and `t` the temperature at which the audio was generated. In-training generation may be switched off by setting `--generate` to `False`.
 
 Before training begins a certain portion of the input dataset is reserved for _validation_, which occurs at the end of each epoch. This is a stage during which the network is exposed to (but not trained on) a small portion of the dataset, the purpose of which is to test whether the network can generalize to inputs that it has not seen before. How well the network does when processing this unseen data can provide insight into whether the network is [overfitting or underfitting](https://www.tensorflow.org/tutorials/keras/overfit_and_underfit) (see the [Statistics](https://github.com/rncm-prism/prism-samplernn#statistics) section below for how validation statistics are reported). The size of the validation set is determined by the `val_frac` parameter, which defaults to 0.1, yielding a 9/1 split between training and validation data, the most common division (note that the actual values are rounded to the nearest multiple of the batch size).
 
@@ -156,9 +158,9 @@ The following table lists the hyper-parameters that may be passed at the command
 | `early_stopping_patience`| Number of epochs with no improvement after which training will be stopped.   | 3      | No        |
 | `generate`               | Whether to generate audio output during training. Generation is aligned with checkpoints, meaning that audio is only generated after a new checkpoint has been created.   | `True`      | No        |
 | `max_generate_per_epoch` | Maximum number of output files to generate at the end of each epoch.   | 1      | No        |
-| `sample_rate`            | Sample rate of the generated audio. | 22050         | No        |
+| `sample_rate`            | Sample rate of the generated audio. | 16000         | No        |
 | `output_file_dur`        | Duration of generated audio files (in seconds). | 3         | No        |
-| `temperature`            | Sampling temperature for generated audio. Multiple values may be passed, to match the number of sequences to be generated. If the number of values exceeds the value of `--num_seqs`, the list will be truncated to match it. If too few values are provided the last value will be repeated until the list length matches the number of requested sequences. | 0.75         | No        |
+| `temperature`            | Sampling temperature for generated audio. Multiple values may be passed, to match the number of sequences to be generated. If the number of values exceeds the value of `--num_seqs`, the list will be truncated to match it. If too few values are provided the last value will be repeated until the list length matches the number of requested sequences. | 0.95         | No        |
 | `seed`                   | Path to audio for seeding when generating audio. | `None`         | No        |
 | `seed_offset`            | Starting offset of the seed audio. | 0         | No        |
 | `val_frac`               | Fraction of the dataset to be set aside for validation, rounded to the nearest multiple of the batch size. Defaults to 0.1, or 10%. | 0.1         | No        |
@@ -299,7 +301,7 @@ python generate.py \
   --config_file ./default.config.json \
   --num_seqs 10 \
   --dur 10 \
-  --sample_rate 22050 \
+  --sample_rate 16000 \
   --seed path/to/seed.wav \
   --seed_offset 500
 ```
@@ -320,7 +322,7 @@ The following is the full list of command line parameters for generate.py:
 | `dur`                      | Duration of generated audio.           | 3           | No       |
 | `num_seqs`                 | Number of audio sequences to generate.          | 1           | No        |
 | `sample_rate`              | Sample rate of the generated audio.          | 44100           | No        |
-| `temperature`              | Sampling temperature for generated audio. Multiple values may be passed, to match the number of sequences to be generated. If the number of values exceeds the value of `--num_seqs`, the list will be truncated to match it. If too few values are provided the last value will be repeated until the list length matches the number of requested sequences.  | 0.75         | No        |
+| `temperature`              | Sampling temperature for generated audio. Multiple values may be passed, to match the number of sequences to be generated. If the number of values exceeds the value of `--num_seqs`, the list will be truncated to match it. If too few values are provided the last value will be repeated until the list length matches the number of requested sequences.  | 0.95         | No        |
 | `seed`                     | Path to audio for seeding when generating audio. | `None`         | No        |
 | `seed_offset`              | Starting offset of the seed audio. | 0         | No        |
 
@@ -345,6 +347,12 @@ Thanks are extended to the rest of the [PRiSM team](https://www.rncm.ac.uk/resea
 -----------
 
 ## Version History
+
+## 14/03/21
+
+* Generated audio files are now saved with names in the format `id_e=1_t=0.95`, with `id` being the id of the current training, `e` the current epoch and `t` the temperature at which the audio was generated.
+* The default sampling temperature for generation is now 0.95.
+* The default sample rate is now 16kHz.
 
 ### 14/03/21
 
