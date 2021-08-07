@@ -53,86 +53,6 @@ def get_arguments():
 # Very interesting article on sampling temperature (including the idea of varying it
 # while sampling): https://www.robinsloan.com/expressive-temperature/
 
-'''
-def generate_and_save_samples_OLD(model, path, seed, seed_offset=0, dur=OUTPUT_DUR,
-                              sample_rate=SAMPLE_RATE, temperature=SAMPLING_TEMPERATURE):
-
-    # Sampling function
-    def sample(samples, temperature=SAMPLING_TEMPERATURE):
-        samples = tf.nn.log_softmax(samples)
-        samples = tf.cast(samples, tf.float64)
-        samples = samples / temperature
-        return tf.random.categorical(samples, 1)
-
-    q_type = model.q_type
-    q_levels = model.q_levels
-    q_zero = q_levels // 2
-    num_samps = dur * sample_rate
-
-    # Precompute sample sequences, initialised to q_zero.
-    samples = np.full((model.batch_size, model.big_frame_size + num_samps, 1), q_zero, dtype='int32')
-
-    # Set seed if provided.
-    if seed is not None:
-        seed_audio = load_seed_audio(seed, seed_offset, model.big_frame_size)
-        samples[:, :model.big_frame_size, :] = quantize(seed_audio, q_type, q_levels)
-
-    print_progress_every = 250
-    start_time = time.time()
-
-    # Run the model tiers. Generates a single sample per step. Each frame-level tier
-    # consumes one frame of samples per step.
-    for t in range(model.big_frame_size, model.big_frame_size + num_samps):
-
-        # Top tier (runs every big_frame_size steps)
-        if t % model.big_frame_size == 0:
-            inputs = samples[:, t - model.big_frame_size : t, :].astype('float32')
-            big_frame_outputs = model.big_frame_rnn(inputs)
-
-        # Middle tier (runs every frame_size steps)
-        if t % model.frame_size == 0:
-            inputs = samples[:, t - model.frame_size : t, :].astype('float32')
-            big_frame_output_idx = (t // model.frame_size) % (
-                model.big_frame_size // model.frame_size
-            )
-            frame_outputs = model.frame_rnn(
-                inputs,
-                conditioning_frames=unsqueeze(big_frame_outputs[:, big_frame_output_idx, :], 1))
-
-        # Sample level tier (runs once per step)
-        inputs = samples[:, t - model.frame_size : t, :]
-        frame_output_idx = t % model.frame_size
-        sample_outputs = model.sample_mlp(
-            inputs,
-            conditioning_frames=unsqueeze(frame_outputs[:, frame_output_idx, :], 1))
-
-        # Generate
-        sample_outputs = tf.reshape(sample_outputs, [-1, q_levels])
-        generated = sample(sample_outputs, temperature)
-
-        # Monitor progress
-        start = t - model.big_frame_size
-        if start % print_progress_every == 0:
-            end = min(start + print_progress_every, num_samps)
-            duration = time.time() - start_time
-            template = 'Generating samples {} - {} of {} (time elapsed: {:.3f} seconds)'
-            print(template.format(start+1, end, num_samps, duration))
-
-        # Update sequences
-        samples[:, t] = np.array(generated).reshape([-1, 1])
-
-    # Save sequences to disk
-    path = path.split('.wav')[0]
-    for i in range(model.batch_size):
-        seq = samples[i].reshape([-1, 1])[model.big_frame_size :].tolist()
-        audio = dequantize(seq, q_type, q_levels)
-        file_name = '{}_{}'.format(path, str(i)) if model.batch_size > 1 else path
-        file_name = '{}.wav'.format(file_name)
-        write_wav(file_name, audio, sample_rate)
-        print('Generated sample output to {}'.format(file_name))
-    print('Done')
-'''
-
 def create_inference_model(ckpt_path, num_seqs, config):
     model = SampleRNN(
         batch_size = num_seqs, # Generate sequences in batches
@@ -170,8 +90,8 @@ def get_temperature(temperature, batch_size):
                 temperature = temperature + [last_val]
         elif len(temperature) > batch_size:
             temperature = temperature[:batch_size]
-        temperature = tf.reshape(temperature, (batch_size, 1))
-    return tf.cast(temperature, tf.float64)
+        temperature = np.reshape(temperature, (batch_size, 1))
+    return np.array(temperature).astype('float64')
 
 def generate(path, ckpt_path, config, num_seqs=NUM_SEQS, dur=OUTPUT_DUR, sample_rate=SAMPLE_RATE,
              temperature=SAMPLING_TEMPERATURE, seed=None, seed_offset=None):
