@@ -120,7 +120,7 @@ class SampleRNN(tf.keras.Model):
 
     def cast_to_lowest(self, inputs):
         # Casts to float16, the policy's lowest-precision dtype
-        return self._mixed_precision_policy.cast_to_lowest(inputs)
+        return tf.cast(inputs, self.compute_dtype)
 
     def call(self, inputs, training=True, temperature=1.0):
         if training==True:
