@@ -348,7 +348,11 @@ Thanks are extended to the rest of the [PRiSM team](https://www.rncm.ac.uk/resea
 
 ## Version History
 
-## 14/03/21
+## 10/08/21
+
+* Fixed bug which occurred if not passing an explicit value for the temperature parameter, either in train.py or generate.py - the internal default was not being forwarded in the correct format.
+
+## 07/08/21
 
 * Generated audio files are now saved with names in the format `id_e=1_t=0.95`, with `id` being the id of the current training, `e` the current epoch and `t` the temperature at which the audio was generated.
 * The default sampling temperature for generation is now 0.95.
