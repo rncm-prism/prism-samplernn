@@ -348,6 +348,10 @@ Thanks are extended to the rest of the [PRiSM team](https://www.rncm.ac.uk/resea
 
 ## Version History
 
+## 24/11/21
+
+* Fixed Windows-specific bug identified in [issue#26](https://github.com/rncm-prism/prism-samplernn/issues/26#issue-1037458893), caused by hardcoded posix pathname in generate.py.
+
 ## 10/08/21
 
 * Fixed bug which occurred if not passing an explicit value for the temperature parameter, either in train.py or generate.py - the internal default was not being forwarded in the correct format.

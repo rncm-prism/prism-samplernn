@@ -126,7 +126,7 @@ def generate(path, ckpt_path, config, num_seqs=NUM_SEQS, dur=OUTPUT_DUR, sample_
     samples = tf.concat(samples, axis=1)
     samples = samples[:, model.big_frame_size:, :]
     # Save sequences to disk
-    epoch = ckpt_path.split('/model.ckpt-')[-1]
+    epoch = ckpt_path.split('model.ckpt-')[-1]
     path = f'{path.split(".wav")[0]}_e={epoch}'
     for i in range(model.batch_size):
         seq = np.reshape(samples[i], (-1, 1))[model.big_frame_size :].tolist()
