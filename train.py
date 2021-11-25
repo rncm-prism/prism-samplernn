@@ -49,6 +49,7 @@ SAMPLING_TEMPERATURE = [0.95]
 SEED_OFFSET = 0
 MAX_GENERATE_PER_EPOCH = 1
 VAL_FRAC = 0.1
+MIXED_PRECISION = False
 
 
 def get_arguments():
@@ -125,8 +126,9 @@ def get_arguments():
     parser.add_argument('--num_val_batches',            type=int,            default=1,
                                                         help='Number of batches to reserve for validation. DEPRECATED: This parameter now has no effect, it is retained for backward-compatibility only and will be removed in a future release. Use val_frac instead.')
                                                         # We use a '%' sign in the help string, which argparse complains about if not escaped with another '%' sign. See: https://stackoverflow.com/a/21168121/795131.
-    parser.add_argument('--val_frac',                   type=float, default=VAL_FRAC,
+    parser.add_argument('--val_frac',                   type=float,          default=VAL_FRAC,
                                                         help='Fraction of the dataset to be set aside for validation, rounded to the nearest multiple of the batch size. Defaults to 0.1, or 10%%.')
+    parser.add_argument('--mixed_precision',            type=check_bool,     default=MIXED_PRECISION, help='Whether to run in mixed precision mode (16-bit floats alongside 32-bit floats where possible)')
     return parser.parse_args()
 
 # Optimizer factory adapted from WaveNet

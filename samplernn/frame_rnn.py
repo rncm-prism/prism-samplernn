@@ -15,12 +15,8 @@ class FrameRNN(tf.keras.layers.Layer):
         self.skip_conn = skip_conn
         self.inputs = tf.keras.layers.Dense(self.dim)
         self.rnn = RNN(rnn_type, self.dim, self.num_layers, self.skip_conn, dropout=(dropout or 0.0))
-
-    def build(self, input_shape):
-        self.upsample = tf.Variable(
-            tf.initializers.GlorotNormal()(
-                shape=[self.num_lower_tier_frames, self.dim, self.dim]),
-            name="upsample",
+        self.upsample = tf.keras.layers.Conv1DTranspose(
+            self.dim, self.num_lower_tier_frames, self.num_lower_tier_frames
         )
 
     def reset_states(self):
@@ -46,16 +42,6 @@ class FrameRNN(tf.keras.layers.Layer):
 
         frame_outputs = self.rnn(input_frames)
 
-        output_shape = [
-            batch_size,
-            num_steps * self.num_lower_tier_frames,
-            self.dim
-        ]
-        frame_outputs = tf.nn.conv1d_transpose(
-            frame_outputs,
-            self.upsample,
-            strides=self.num_lower_tier_frames,
-            output_shape=output_shape,
-        )
+        frame_outputs = self.upsample(frame_outputs)
 
         return frame_outputs
