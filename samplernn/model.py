@@ -118,15 +118,19 @@ class SampleRNN(tf.keras.Model):
         self.big_frame_rnn.reset_states()
         self.frame_rnn.reset_states()
 
+    def cast_to_lowest(self, inputs):
+        # Casts to float16, the policy's lowest-precision dtype
+        return tf.cast(inputs, self.compute_dtype)
+
     def call(self, inputs, training=True, temperature=1.0):
         if training==True:
             # UPPER TIER
             big_frame_outputs = self.big_frame_rnn(
-                tf.cast(inputs, tf.float32)[:, : -self.big_frame_size, :]
+                self.cast_to_lowest(inputs)[:, : -self.big_frame_size, :]
             )
             # MIDDLE TIER
             frame_outputs = self.frame_rnn(
-                tf.cast(inputs, tf.float32)[:, self.big_frame_size-self.frame_size : -self.frame_size, :],
+                self.cast_to_lowest(inputs)[:, self.big_frame_size-self.frame_size : -self.frame_size, :],
                 conditioning_frames=big_frame_outputs,
             )
             # LOWER TIER (SAMPLES)

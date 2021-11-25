@@ -16,6 +16,8 @@ import tensorflow as tf
 tf.get_logger().setLevel('ERROR')
 tf.autograph.set_verbosity(3)
 
+tf.keras.mixed_precision.set_global_policy('mixed_float16')
+
 import numpy as np
 import librosa
 from natsort import natsorted
