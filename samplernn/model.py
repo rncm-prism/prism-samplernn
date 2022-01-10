@@ -8,20 +8,20 @@ from .utils import unsqueeze
 
 class SampleRNN(tf.keras.Model):
 
-    def __init__(self, batch_size, frame_sizes, q_levels, q_type, dim, rnn_type,
-                 num_rnn_layers, seq_len, emb_size, skip_conn, rnn_dropout):
+    def __init__(self, **kwargs):
         super(SampleRNN, self).__init__()
-        self.batch_size = batch_size
-        self.big_frame_size = frame_sizes[1]
-        self.frame_size = frame_sizes[0]
-        self.q_type = q_type
-        self.q_levels = q_levels
-        self.dim = dim
-        self.rnn_type = rnn_type
-        self.num_rnn_layers = num_rnn_layers
-        self.seq_len = seq_len
-        self.emb_size = emb_size
-        self.skip_conn = skip_conn
+        self.batch_size = kwargs.get('batch_size')
+        self.big_frame_size = kwargs.get('frame_sizes')[1]
+        self.frame_size = kwargs.get('frame_sizes')[0]
+        self.q_type = kwargs.get('q_type')
+        self.q_levels = kwargs.get('q_levels')
+        self.dim = kwargs.get('dim')
+        self.rnn_type = kwargs.get('rnn_type')
+        self.num_rnn_layers = kwargs.get('num_rnn_layers')
+        self.seq_len = kwargs.get('seq_len')
+        self.emb_size = kwargs.get('emb_size')
+        self.skip_conn = kwargs.get('skip_conn')
+        self.mixed_precision = kwargs.get('mixed_precision')
 
         self.big_frame_rnn = FrameRNN(
             rnn_type = self.rnn_type,
@@ -31,7 +31,7 @@ class SampleRNN(tf.keras.Model):
             dim = self.dim,
             q_levels = self.q_levels,
             skip_conn = self.skip_conn,
-            dropout=rnn_dropout
+            dropout=kwargs.get('rnn_dropout')
         )
 
         self.frame_rnn = FrameRNN(
@@ -42,7 +42,7 @@ class SampleRNN(tf.keras.Model):
             dim = self.dim,
             q_levels = self.q_levels,
             skip_conn = self.skip_conn,
-            dropout=rnn_dropout
+            dropout=kwargs.get('rnn_dropout')
         )
 
         self.sample_mlp = SampleMLP(
@@ -118,19 +118,20 @@ class SampleRNN(tf.keras.Model):
         self.big_frame_rnn.reset_states()
         self.frame_rnn.reset_states()
 
-    def cast_to_lowest(self, inputs):
+    def cast(self, inputs):
         # Casts to float16, the policy's lowest-precision dtype
-        return tf.cast(inputs, self.compute_dtype)
+        dtype = self.compute_dtype if self.mixed_precision==True else tf.float32
+        return tf.cast(inputs, dtype)
 
     def call(self, inputs, training=True, temperature=1.0):
         if training==True:
             # UPPER TIER
             big_frame_outputs = self.big_frame_rnn(
-                self.cast_to_lowest(inputs)[:, : -self.big_frame_size, :]
+                self.cast(inputs)[:, : -self.big_frame_size, :]
             )
             # MIDDLE TIER
             frame_outputs = self.frame_rnn(
-                self.cast_to_lowest(inputs)[:, self.big_frame_size-self.frame_size : -self.frame_size, :],
+                self.cast(inputs)[:, self.big_frame_size-self.frame_size : -self.frame_size, :],
                 conditioning_frames=big_frame_outputs,
             )
             # LOWER TIER (SAMPLES)

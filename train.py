@@ -16,8 +16,6 @@ import tensorflow as tf
 tf.get_logger().setLevel('ERROR')
 tf.autograph.set_verbosity(3)
 
-tf.keras.mixed_precision.set_global_policy('mixed_float16')
-
 import numpy as np
 import librosa
 from natsort import natsorted
@@ -152,28 +150,29 @@ optimizer_factory = {'adam': create_adam_optimizer,
                      'rmsprop': create_rmsprop_optimizer}
 
 
-def create_model(batch_size, config):
-    seq_len = config.get('seq_len')
-    frame_sizes = config.get('frame_sizes')
-    q_type = config.get('q_type')
-    q_levels = 256 if q_type=='mu-law' else config.get('q_levels')
+def create_model(**kwargs):
+    seq_len = kwargs.get('seq_len')
+    frame_sizes = kwargs.get('frame_sizes')
+    q_type = kwargs.get('q_type')
+    q_levels = 256 if q_type=='mu-law' else kwargs.get('q_levels')
     assert frame_sizes[0] < frame_sizes[1], 'Frame sizes should be specified in ascending order'
     # The following model configuration interdependencies are sourced from the original implementation:
     # https://github.com/soroushmehr/sampleRNN_ICLR2017/blob/master/models/three_tier/three_tier.py
     assert seq_len % frame_sizes[1] == 0, 'seq_len should be evenly divisible by tier 2 frame size'
     assert frame_sizes[1] % frame_sizes[0] == 0, 'Tier 2 frame size should be evenly divisible by tier 1 frame size'
     return SampleRNN(
-        batch_size=batch_size,
+        batch_size=kwargs.get('batch_size'),
         frame_sizes=frame_sizes,
         seq_len=seq_len,
         q_type=q_type,
         q_levels=q_levels,
-        dim=config.get('dim'),
-        rnn_type=config.get('rnn_type'),
-        num_rnn_layers=config.get('num_rnn_layers'),
-        emb_size=config.get('emb_size'),
-        skip_conn=config.get('skip_conn'),
-        rnn_dropout=config.get('rnn_dropout')
+        dim=kwargs.get('dim'),
+        rnn_type=kwargs.get('rnn_type'),
+        num_rnn_layers=kwargs.get('num_rnn_layers'),
+        emb_size=kwargs.get('emb_size'),
+        skip_conn=kwargs.get('skip_conn'),
+        rnn_dropout=kwargs.get('rnn_dropout'),
+        mixed_precision=kwargs.get('mixed_precision')
     )
 
 def get_latest_checkpoint(logdir):
@@ -205,6 +204,9 @@ def get_initial_epoch(ckpt_path):
 def main():
     args = get_arguments()
 
+    if args.mixed_precision==True:
+        tf.keras.mixed_precision.set_global_policy('mixed_float16')
+
     train_split, val_split = get_dataset_filenames_split(
         args.data_dir, args.val_frac, args.batch_size)
 
@@ -226,7 +228,8 @@ def main():
     with open(args.config_file, 'r') as config_file:
         config = json.load(config_file)
     # Create the model
-    model = create_model(args.batch_size, config)
+    model_kwargs = dict([('batch_size', args.batch_size), ('mixed_precision', args.mixed_precision)] + list(config.items()))
+    model = create_model(**model_kwargs)
 
     seq_len = model.seq_len
     overlap = model.big_frame_size
