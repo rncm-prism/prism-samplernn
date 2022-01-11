@@ -1,0 +1,10 @@
+.git
+.cache
+*.config.json
+!default.config.json
+*.wav
+*.zip
+*.log
+*.ipynb
+logdir/*/*
+generated/*/*
