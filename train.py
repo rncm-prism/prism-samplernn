@@ -31,6 +31,7 @@ OUTDIR = './generated'
 CONFIG_FILE = './default.config.json'
 NUM_EPOCHS = 100
 BATCH_SIZE = 64
+DEVICE = "All"
 LEARNING_RATE = 0.001
 MOMENTUM = 0.9
 SILENCE_THRESHOLD = None
@@ -92,6 +93,8 @@ def get_arguments():
                                                         help='Sample rate of the generated audio')
     parser.add_argument('--num_epochs',                 type=check_positive, default=NUM_EPOCHS,
                                                         help='Number of training epochs')
+    parser.add_argument('--device',                     type=str,            default=DEVICE,
+                                                        help='Number of the GPU to use, or All (the default) to use all devices available.')
     parser.add_argument('--optimizer',                  type=str,            default='adam', choices=optimizer_factory.keys(),
                                                         help='Type of training optimizer to use')
     parser.add_argument('--learning_rate',              type=float,          default=LEARNING_RATE,
@@ -201,8 +204,8 @@ def get_initial_epoch(ckpt_path):
         epoch = 0
     return epoch
 
-def main():
-    args = get_arguments()
+def main(args):
+    #args = get_arguments()
 
     if args.mixed_precision==True:
         tf.keras.mixed_precision.set_global_policy('mixed_float16')
@@ -339,4 +342,14 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    args = get_arguments()
+    device = args.device
+    if device != "All":
+        device = int(device)
+        if device < 0:
+            err_msg = f"Value of {device} for GPU device is not possible, must be 0 or above."
+            raise argparse.ArgumentTypeError(err_msg)
+        with tf.device(f'/GPU:{device}'):
+            main(args)
+    else:
+        main(args)
