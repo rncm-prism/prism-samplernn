@@ -344,12 +344,13 @@ def main(args):
 if __name__ == '__main__':
     args = get_arguments()
     device = args.device
-    if device != "All":
+    if str(device).upper() != "ALL":
         device = int(device)
         if device < 0:
             err_msg = f"Value of {device} for GPU device is not possible, must be 0 or above."
             raise argparse.ArgumentTypeError(err_msg)
-        with tf.device(f'/GPU:{device}'):
-            main(args)
+        gpus = tf.config.list_physical_devices('GPU')
+        tf.config.set_visible_devices(gpus[device], 'GPU')
+        main(args)
     else:
         main(args)
