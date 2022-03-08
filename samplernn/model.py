@@ -60,7 +60,11 @@ class SampleRNN(tf.keras.Model):
                 target,
                 prediction,
                 regularization_losses=self.losses)
+            if (self.mixed_precision == True):
+                loss = self.optimizer.get_scaled_loss(loss)
         grads = tape.gradient(loss, self.trainable_variables)
+        if (self.mixed_precision == True):
+            grads = self.optimizer.get_unscaled_gradients(grads)
         grads, _ = tf.clip_by_global_norm(grads, 5.0)
         self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
         self.compiled_metrics.update_state(target, prediction)
