@@ -21,8 +21,4 @@ RUN pip install numpy==1.20
 RUN pip install librosa
 RUN pip install natsort
 
-# Add a new user "user1" with user id 8877
-RUN useradd -u 8877 user1
-# Change to non-root privilege
-USER user1
 
