@@ -19,6 +19,7 @@
     - [Command Line Arguments](https://github.com/rncm-prism/prism-samplernn#command-line-arguments)
     - [Configuring the Model](https://github.com/rncm-prism/prism-samplernn#configuring-the-model)
     - [Resuming Training](https://github.com/rncm-prism/prism-samplernn#resuming-training)
+    - [Mixed Precision Training](https://github.com/rncm-prism/prism-samplernn#mixed-precision-training)
     - [Hyperparameter Optimization](https://github.com/rncm-prism/prism-samplernn#hyperparameter-optimization)
         - [Hyperparameter Optimization with Keras Tuner](https://github.com/rncm-prism/prism-samplernn#hyperparameter-optimization-with-keras-tuner)
         - [Hyperparameter Optimization with Ray Tune](https://github.com/rncm-prism/prism-samplernn#hyperparameter-optimization-with-ray-tune)
@@ -144,6 +145,7 @@ The following table lists the hyper-parameters that may be passed at the command
 | `logdir_root`            | Location in which to store training log files and checkpoints. All such files are placed in a subdirectory with the id of the training session.           | `./logdir`           | No      |
 | `output_dir`             | Path to the directory for audio generated during training.           | `./generated`           | No      |
 | `config_file`            | File containing the configuration parameters for the training model. Note that this file must contain valid JSON, and should have a name that conforms to the `*.config.json` pattern. | `./default.config.json`         | No        |
+| `device`                 | GPU allocation. Set this to the number of a specific device (indexed from 0), or pass `All` (the default) to allow all visible devices to be used.          | `All`           | No        |
 | `num_epochs`             | Number of epochs to run the training. | 100           | No        |
 | `batch_size`             | Size of the mini-batch. It is recommended that the batch size divide the length of the training corpus without remainder, otherwise the dataset will be truncated to the nearest multiple of the batch size. | 64         | No        |
 | `optimizer`              | TensorFlow optimizer to use for training. (`adam`, `sgd` or `rmsprop`) | `adam`        | No        |
@@ -164,7 +166,7 @@ The following table lists the hyper-parameters that may be passed at the command
 | `seed`                   | Path to audio for seeding when generating audio. | `None`         | No        |
 | `seed_offset`            | Starting offset of the seed audio. | 0         | No        |
 | `val_frac`               | Fraction of the dataset to be set aside for validation, rounded to the nearest multiple of the batch size. Defaults to 0.1, or 10%. | 0.1         | No        |
-| `num_val_batches`        | Number of batches to reserve for validation. DEPRECATED: This parameter now has no effect, it is retained for backward-compatibility only and will be removed in a future release. Use `val_frac` instead. | 1         | No        |
+| `mixed_precision`               | Whether to run the training in mixed precision mode, which sets the floating point precision of some internal layers of the model to 16-bits. This can greatly speed up training step time. | `False`         | No        |
 
 ### Configuring the Model
 
@@ -185,6 +187,16 @@ Model parameters are specified through a JSON configuration file, which may be p
 ### Resuming Training
 
 A training session that has been halted, perhaps by `Ctrl-C`, may be resumed from a previously saved checkpoint. The weights saved to the checkpoint will be loaded into a fresh model, resuming at the last epoch + 1. To enable this set `--resume` to `True`, and optionally the path to a checkpoint through the `--resume_from` parameter (ignored when `--resume` is `False`). If no such checkpoint is supplied the program will search through any previous training run directories for the latest checkpoint. If no checkpoint is found training will begin again from scratch.
+
+### Mixed Precision Training
+
+A significant speed-up in training time can be achieved by running the training in mixed precision mode, by setting the value of the `--mixed_precision` hyperparameter to `True` (the default is `False`). Mixed precision is a mode of the model which involves the use of both 16-bit and 32-bit floating-point types. This means that less memory is used when training the model, which can greatly speed up training time. In fact in our own experiments we have found an increase in training step speed of around 3.5 times (although YMMV).
+
+Generation using mixed precision has not yet been implemented, but will be available soon.
+
+For more on the underlying TensorFlow mixed precision implementation see the [official documentation](https://www.tensorflow.org/guide/mixed_precision).
+
+Note that mixed precision training will only show a significant increase in training speed with recent NVIDIA GPUs, with compute capability 7.0 or higher. In particular GPUs provided by Google Colab will typically be from much older generations, which will not benefit from mixed precision training.
 
 ### Hyperparameter Optimization
 
@@ -319,9 +331,10 @@ The following is the full list of command line parameters for generate.py:
 | `output_path`              | Path to the generated .wav file.          | `None`           | Yes        |
 | `checkpoint_path`          | Path to a saved checkpoint for the model.           | `None`           | Yes        |
 | `config_file`              | Path to the JSON config for the model.          | `None`           | Yes        |
+| `device`                   | GPU allocation. Set this to the number of a specific device (indexed from 0), or pass `All` (the default) to allow all visible devices to be used.          | `All`           | No        |
 | `dur`                      | Duration of generated audio.           | 3           | No       |
 | `num_seqs`                 | Number of audio sequences to generate.          | 1           | No        |
-| `sample_rate`              | Sample rate of the generated audio.          | 44100           | No        |
+| `sample_rate`              | Sample rate of the generated audio.          | 16000           | No        |
 | `temperature`              | Sampling temperature for generated audio. Multiple values may be passed, to match the number of sequences to be generated. If the number of values exceeds the value of `--num_seqs`, the list will be truncated to match it. If too few values are provided the last value will be repeated until the list length matches the number of requested sequences.  | 0.95         | No        |
 | `seed`                     | Path to audio for seeding when generating audio. | `None`         | No        |
 | `seed_offset`              | Starting offset of the seed audio. | 0         | No        |
@@ -347,6 +360,11 @@ Thanks are extended to the rest of the [PRiSM team](https://www.rncm.ac.uk/resea
 -----------
 
 ## Version History
+
+## 26/03/22
+
+* Training with mixed precision floating point types is now available, using the `--mixed_precision` command line parameter to train.py.
+* It is also now possible to target a specific GPU for training or for generation, with the new `--device` parameter. On machines with multiple GPUs this means that multiple training sessions can be run simultaneously.
 
 ## 24/11/21
 

@@ -124,8 +124,6 @@ def get_arguments():
     parser.add_argument('--seed',                       type=str,            help='Path to audio for seeding')
     parser.add_argument('--seed_offset',                type=int,            default=SEED_OFFSET,
                                                         help='Starting offset of the seed audio')
-    parser.add_argument('--num_val_batches',            type=int,            default=1,
-                                                        help='Number of batches to reserve for validation. DEPRECATED: This parameter now has no effect, it is retained for backward-compatibility only and will be removed in a future release. Use val_frac instead.')
                                                         # We use a '%' sign in the help string, which argparse complains about if not escaped with another '%' sign. See: https://stackoverflow.com/a/21168121/795131.
     parser.add_argument('--val_frac',                   type=float,          default=VAL_FRAC,
                                                         help='Fraction of the dataset to be set aside for validation, rounded to the nearest multiple of the batch size. Defaults to 0.1, or 10%%.')

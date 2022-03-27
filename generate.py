@@ -13,6 +13,7 @@ from samplernn import (SampleRNN, write_wav, quantize, dequantize, unsqueeze)
 
 
 OUTPUT_DUR = 3 # Duration of generated audio in seconds
+DEVICE = "All"
 SAMPLE_RATE = 16000 # Sample rate of generated audio
 NUM_SEQS = 1
 SAMPLING_TEMPERATURE = [0.95]
@@ -33,6 +34,8 @@ def get_arguments():
                                                         help='Path to a saved checkpoint for the model')
     parser.add_argument('--config_file',                type=str,            required=True,
                                                         help='Path to the JSON config for the model')
+    parser.add_argument('--device',                     type=str,            default=DEVICE,
+                                                        help='Number of the GPU to use, or All (the default) to use all devices available')
     parser.add_argument('--dur',                        type=check_positive, default=OUTPUT_DUR,
                                                         help='Duration of generated audio')
     parser.add_argument('--num_seqs',                   type=check_positive, default=NUM_SEQS,
@@ -138,13 +141,23 @@ def generate(path, ckpt_path, config, num_seqs=NUM_SEQS, dur=OUTPUT_DUR, sample_
     print('Done')
 
 
-def main():
-    args = get_arguments()
+def main(args):
+    #args = get_arguments()
     with open(args.config_file, 'r') as config_file:
         config = json.load(config_file)
     generate(args.output_path, args.checkpoint_path, config, args.num_seqs, args.dur,
              args.sample_rate, args.temperature, args.seed, args.seed_offset)
 
-
 if __name__ == '__main__':
-    main()
+    args = get_arguments()
+    device = args.device
+    if str(device).upper() != "ALL":
+        device = int(device)
+        if device < 0:
+            err_msg = f"Value of {device} for GPU device is not possible, must be 0 or above."
+            raise argparse.ArgumentTypeError(err_msg)
+        gpus = tf.config.list_physical_devices('GPU')
+        tf.config.set_visible_devices(gpus[device], 'GPU')
+        main(args)
+    else:
+        main(args)
