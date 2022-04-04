@@ -192,7 +192,7 @@ A training session that has been halted, perhaps by `Ctrl-C`, may be resumed fro
 
 A significant speed-up in training time can be achieved by running the training in mixed precision mode, by setting the value of the `--mixed_precision` hyperparameter to `True` (the default is `False`). Mixed precision is a mode of the model which involves the use of both 16-bit and 32-bit floating-point types. This means that less memory is used when training the model, which can greatly speed up training time. In fact in our own experiments we have found an increase in training step speed of around 3.5 times (although YMMV).
 
-Generation using mixed precision has not yet been implemented, but will be available soon.
+Generation using mixed precision has not yet been implemented, but the current generate.py script can be used to generate from models trained in either mode.
 
 For more on the underlying TensorFlow mixed precision implementation see the [official documentation](https://www.tensorflow.org/guide/mixed_precision).
 
