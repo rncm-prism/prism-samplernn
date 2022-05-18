@@ -357,6 +357,8 @@ The following is a list of resources providing further information on SampleRNN,
 
 Thanks are extended to the rest of the [PRiSM team](https://www.rncm.ac.uk/research/research-centres-rncm/prism/prism-team/) for their help and support during development, and especially to [Dr Sam Salem](https://www.rncm.ac.uk/people/sam-salem/) for his immense patience, diligence and perseverance in testing the code.
 
+Thanks also to [Tanguy Pocquet](https://linkedin.com/in/tanguy-pocquet-2bb72b1ba/) for his contribution to developing and testing the mixed precision training code, and also [Dr Bofan Ma](https://mabofan.com) for testing the scripts on the MacBook M1 chip.
+
 -----------
 
 ## Version History
